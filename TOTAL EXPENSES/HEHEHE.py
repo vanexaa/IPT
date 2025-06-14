@@ -162,8 +162,8 @@ def update_pie_chart_section(event, canvas, month_combobox, total_expenses_lbl):
     current_width = event.width
     current_height = event.height
 
-    # Position month combobox (top-left)
-    canvas.create_window(current_width * 0.15, 40, window=month_combobox, anchor="w")
+    # Position month combobox (centered horizontally at the top)
+    canvas.create_window(current_width / 2, 40, window=month_combobox, anchor="n")
 
     # --- Matplotlib Pie Chart ---
     chart_height_ratio = 0.6
@@ -223,14 +223,14 @@ def update_recent_transaction_box(event):
     recent_transaction_canvas.create_text(current_width - 30, 60, anchor="ne", text="Amount", font=FONT_SUBTEXT,
                                           fill="black")
 
+
     # Category Dropdown
     if recent_transaction_category_combobox is None or not recent_transaction_category_combobox.winfo_exists():
         recent_transaction_category_combobox_var = tk.StringVar(value="Category")
         recent_transaction_category_combobox = ttk.Combobox(
             recent_transaction_canvas,
             textvariable=recent_transaction_category_combobox_var,
-            values=["Category", "Food", "School Supplies", "Emergency Funds", "School Fees", "General Savings",
-                    "Personal Goal", "Future Purchases"],
+            values=["Category", "Food", "Travel Fare", "Emergency Funds", "School Supply", "Others"],
             state="readonly",
             width=10,
             font=FONT_SUBTEXT,
@@ -253,7 +253,8 @@ def update_recent_transaction_box(event):
     # Peso sign watermark (faded in background)
     recent_transaction_canvas.create_text(current_width / 2, current_height / 2, text="₱",
                                           font=("Arial", int(current_height * 0.7), "bold"),
-                                          fill="#f0f0e0", anchor="center", tags="watermark")
+                                          fill=COLOR_PIE_SLICE_3, anchor="center", tags="watermark")  # Changed fill color for visibility
+    recent_transaction_canvas.tag_lower("watermark") # Ensures it's in the background
 
 
 # --- Main App Window ---
@@ -311,11 +312,11 @@ months = ["January", "February", "March", "April", "May", "June",
           "July", "August", "September", "October", "November", "December"]
 
 month_var = tk.StringVar(value="January") # Set initial value to January
-month_combo = ttk.Combobox(pie_chart_section_canvas, textvariable=month_var, values=months,
+month_combo = ttk.Combobox(pie_chart_section_canvas, textvariable=month_var, values=months, # Values now Jan-Dec
                            state="readonly", font=FONT_SUBTEXT, justify="center", width=10) # Adjust width if needed
 
 # Set default selection
-month_combo.current(0)
+month_combo.current(0) #
 # --- END MODIFIED CODE ---
 
 
@@ -334,8 +335,7 @@ recent_transaction_category_combobox_var = tk.StringVar(value="Category")
 recent_transaction_category_combobox = ttk.Combobox(
     recent_transaction_canvas,
     textvariable=recent_transaction_category_combobox_var,
-    values=["Category", "Food", "School Supplies", "Emergency Funds", "School Fees", "General Savings", "Personal Goal",
-            "Future Purchases"],
+    values=["Category", "Food", "Travel Fare", "Emergency Funds", "School Supply", "Others"],
     state="readonly",
     width=10,
     font=FONT_SUBTEXT,

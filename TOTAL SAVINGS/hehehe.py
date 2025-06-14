@@ -131,22 +131,22 @@ def draw_rounded_rect(canvas, x, y, w, h, r, color, outline_color="", outline_wi
 
 # Global labels to be managed by draw_top_right_header_content
 tracku_label_tk = None
-total_expenses_label_tk = None
+total_savings_label_tk = None
 
 
 def draw_top_right_header_content(event):
     """Draws the custom rounded rectangle and places content on the top right header canvas."""
-    global tracku_label_tk, total_expenses_label_tk
+    global tracku_label_tk, total_savings_label_tk
     top_right_header_canvas.delete("all")
     draw_bottom_rounded_rect(top_right_header_canvas, 0, 0, event.width, event.height, 20, COLOR_NAVBAR)
 
     if tracku_label_tk is None:
         tracku_label_tk = tk.Label(top_right_header_canvas, text="TrackU", font=FONT_BRAND, bg=COLOR_NAVBAR, fg="black")
-        total_expenses_label_tk = tk.Label(top_right_header_canvas, text="Total Expenses", font=("Georgia", 16),
+        total_savings_label_tk = tk.Label(top_right_header_canvas, text="Total Savings", font=("Georgia", 16),
                                            bg=COLOR_NAVBAR, fg="#222")
 
     top_right_header_canvas.create_window(30, event.height / 2, window=tracku_label_tk, anchor="w")
-    top_right_header_canvas.create_window(event.width - 30, event.height / 2, window=total_expenses_label_tk,
+    top_right_header_canvas.create_window(event.width - 30, event.height / 2, window=total_savings_label_tk,
                                           anchor="e")
 
 
@@ -162,8 +162,8 @@ def update_pie_chart_section(event, canvas, month_combobox, total_expenses_lbl):
     current_width = event.width
     current_height = event.height
 
-    # Position month combobox (top-left)
-    canvas.create_window(current_width * 0.15, 40, window=month_combobox, anchor="w")
+    # Position month combobox (centered horizontally at the top)
+    canvas.create_window(current_width / 2, 40, window=month_combobox, anchor="n")
 
     # --- Matplotlib Pie Chart ---
     chart_height_ratio = 0.6
@@ -192,8 +192,8 @@ def update_pie_chart_section(event, canvas, month_combobox, total_expenses_lbl):
     canvas.create_window(current_width / 2, chart_center_y, window=canvas_chart_widget, anchor="center")
     canvas_chart_widget_ref = canvas_chart_widget
 
-    total_expenses_y = current_height * (0.15 + chart_height_ratio) + 30
-    canvas.create_window(current_width / 2, total_expenses_y, window=total_expenses_lbl, anchor="n")
+    total_savings_y = current_height * (0.15 + chart_height_ratio) + 30
+    canvas.create_window(current_width / 2, total_savings_y, window=total_savings_lbl, anchor="n")
 
     plt.close(fig)
 
@@ -222,6 +222,7 @@ def update_recent_transaction_box(event):
     # Column Headers: "Amount" (Category is handled by the dropdown)
     recent_transaction_canvas.create_text(current_width - 30, 60, anchor="ne", text="Amount", font=FONT_SUBTEXT,
                                           fill="black")
+
 
     # Category Dropdown
     if recent_transaction_category_combobox is None or not recent_transaction_category_combobox.winfo_exists():
@@ -253,7 +254,8 @@ def update_recent_transaction_box(event):
     # Peso sign watermark (faded in background)
     recent_transaction_canvas.create_text(current_width / 2, current_height / 2, text="₱",
                                           font=("Arial", int(current_height * 0.7), "bold"),
-                                          fill="#f0f0e0", anchor="center", tags="watermark")
+                                          fill=COLOR_PIE_SLICE_3, anchor="center", tags="watermark")  # Changed fill color for visibility
+    recent_transaction_canvas.tag_lower("watermark") # Ensures it's in the background
 
 
 # --- Main App Window ---
@@ -311,15 +313,15 @@ months = ["January", "February", "March", "April", "May", "June",
           "July", "August", "September", "October", "November", "December"]
 
 month_var = tk.StringVar(value="January") # Set initial value to January
-month_combo = ttk.Combobox(pie_chart_section_canvas, textvariable=month_var, values=months,
+month_combo = ttk.Combobox(pie_chart_section_canvas, textvariable=month_var, values=months, # Values now Jan-Dec
                            state="readonly", font=FONT_SUBTEXT, justify="center", width=10) # Adjust width if needed
 
 # Set default selection
-month_combo.current(0)
+month_combo.current(0) #
 # --- END MODIFIED CODE ---
 
 
-total_expenses_amount_lbl = tk.Label(pie_chart_section_canvas, text="Total Expenses:\n₱ 100,000.00",
+total_expenses_amount_lbl = tk.Label(pie_chart_section_canvas, text="Total Savings:\n₱ 100,000.00",
                                      font=("Georgia", 13), bg=COLOR_BG, fg="black", justify=tk.LEFT)
 
 pie_chart_section_canvas.bind("<Configure>",
@@ -334,8 +336,7 @@ recent_transaction_category_combobox_var = tk.StringVar(value="Category")
 recent_transaction_category_combobox = ttk.Combobox(
     recent_transaction_canvas,
     textvariable=recent_transaction_category_combobox_var,
-    values=["Category", "Food", "School Supplies", "Emergency Funds", "School Fees", "General Savings", "Personal Goal",
-            "Future Purchases"],
+    values=["Category", "Food", "Emergency Funds", "Future Purchases", "Personal Goals", "General Savings"],
     state="readonly",
     width=10,
     font=FONT_SUBTEXT,
