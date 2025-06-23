@@ -1,124 +1,180 @@
-import tkinter as tk
+ import tkinter as tk
 from tkinter import font
+import tkinter.messagebox
+import sys
+import os
 
-# ======== SavingsInputApp class =========
+current_script_dir = os.path.dirname(__file__)
+database_folder_path = current_script_dir
+if database_folder_path not in sys.path:
+    sys.path.append(database_folder_path)
+
+import database_manager
+
 BG_COLOR = "#FCFAF2"
 BTN_COLOR = "#FAD7A0"
 BTN_ACTIVE = "#F9D7A0"
 BORDER_COLOR = "#000"
 FONT_FAMILY = "Georgia"
+EXPENSE_CATEGORIES = ["Food", "Travel Fare", "School Supply", "Others"]
 
-class SavingsInputApp(tk.Toplevel):
+def center_toplevel_window(window):
+    window.update_idletasks()
+    window_width = window.winfo_width()
+    window_height = window.winfo_height()
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+    x = (screen_width // 2) - (window_width // 2)
+    y = (screen_height // 2) - (window_height // 2)
+    window.geometry(f"+{x}+{y}")
+
+class ExpensesInputApp(tk.Toplevel):
     def __init__(self, master=None, category="Food"):
         super().__init__(master)
-        self.title("Savings Input")
+        self.title("Expense Input")
         self.configure(bg=BG_COLOR)
         self.geometry("600x500")
         self.resizable(False, False)
-
+        self.overrideredirect(True)
         self.title_font = font.Font(family=FONT_FAMILY, size=22, weight="bold")
         self.label_font = font.Font(family=FONT_FAMILY, size=18)
         self.btn_font = font.Font(family=FONT_FAMILY, size=18)
         self.small_font = font.Font(family=FONT_FAMILY, size=13)
-
         self.category = category
         self.create_widgets()
+        center_toplevel_window(self)
+        self._x = 0
+        self._y = 0
+        self.main_frame.bind("<ButtonPress-1>", self.start_move)
+        self.main_frame.bind("<B1-Motion>", self.do_move)
+
+    def start_move(self, event):
+        self._x = event.x
+        self._y = event.y
+
+    def do_move(self, event):
+        deltax = event.x - self._x
+        deltay = event.y - self._y
+        x = self.winfo_x() + deltax
+        y = self.winfo_y() + deltay
+        self.geometry(f"+{x}+{y}")
 
     def create_widgets(self):
-        main_frame = tk.Frame(self, bg=BG_COLOR, highlightbackground=BORDER_COLOR, highlightthickness=2)
-        main_frame.place(relx=0.5, rely=0.5, anchor="center", width=520, height=450)
-
-        cancel_btn = tk.Button(main_frame, text="⛔", font=self.btn_font, bg="#E74C3C", fg="white",
+        self.main_frame = tk.Frame(self, bg=BG_COLOR, highlightbackground=BORDER_COLOR, highlightthickness=2)
+        self.main_frame.place(relx=0.5, rely=0.5, anchor="center", width=520, height=450)
+        cancel_btn = tk.Button(self.main_frame, text="⛔", font=self.btn_font, bg="#E74C3C", fg="white",
                                bd=0, activebackground="#C0392B", command=self.destroy)
         cancel_btn.place(x=15, y=15, width=40, height=40)
-        cancel_label = tk.Label(main_frame, text="Cancel", font=self.small_font, bg=BG_COLOR, fg=BORDER_COLOR)
+        cancel_label = tk.Label(self.main_frame, text="Cancel", font=self.small_font, bg=BG_COLOR, fg=BORDER_COLOR)
         cancel_label.place(x=60, y=25)
-
-        # Changed label from "Savings" to "Expenses"
-        expenses_label = tk.Label(main_frame, text="Expenses", font=self.small_font, bg=BG_COLOR, fg=BORDER_COLOR)
+        expenses_label = tk.Label(self.main_frame, text="Expenses", font=self.small_font, bg=BG_COLOR, fg=BORDER_COLOR)
         expenses_label.place(x=420, y=25)
-
-        title_label = tk.Label(main_frame, text=self.category, font=self.title_font, bg=BG_COLOR, fg=BORDER_COLOR)
+        title_label = tk.Label(self.main_frame, text=self.category, font=self.title_font, bg=BG_COLOR, fg=BORDER_COLOR)
         title_label.place(relx=0.5, y=60, anchor="center")
-
-        entry_frame = tk.Frame(main_frame, bg=BTN_COLOR, bd=2, relief="groove")
+        entry_frame = tk.Frame(self.main_frame, bg=BTN_COLOR, bd=2, relief="groove")
         entry_frame.place(relx=0.5, y=110, anchor="center", width=220, height=50)
-
         currency_label = tk.Label(entry_frame, text="₱", font=self.label_font, bg=BTN_COLOR)
         currency_label.place(x=10, y=8)
-
         self.amount_var = tk.StringVar(value="0")
         amount_entry = tk.Entry(entry_frame, textvariable=self.amount_var, font=self.label_font,
                                 bd=0, bg=BTN_COLOR, justify="right")
         amount_entry.place(x=40, y=8, width=110, height=30)
-
         def update_scroll(*args):
             amount_entry.xview_moveto(1)
         self.amount_var.trace_add("write", update_scroll)
-
-        check_btn = tk.Button(main_frame, text="✔", font=self.btn_font, bg=BTN_COLOR, bd=0,
+        check_btn = tk.Button(self.main_frame, text="✔", font=self.btn_font, bg=BTN_COLOR, bd=0,
                               activebackground=BTN_ACTIVE, command=self.on_submit)
         check_btn.place(x=370, y=85, width=45, height=45)
-
         btns = [
             ['7', '8', '9'],
             ['4', '5', '6'],
             ['1', '2', '3'],
             ['.', '0', '⌫']
         ]
-
         btn_width = 60
         btn_height = 40
         padding_x = 10
         padding_y = 8
-
         total_width = 3 * btn_width + 2 * padding_x
         keypad_start_x = (520 - total_width) // 2
         keypad_start_y = 170
-
         for r, row in enumerate(btns):
             for c, char in enumerate(row):
                 x_pos = keypad_start_x + c * (btn_width + padding_x)
                 y_pos = keypad_start_y + r * (btn_height + padding_y)
-                btn = tk.Button(main_frame, text=char, font=self.btn_font, bg=BTN_COLOR, bd=0,
+                btn = tk.Button(self.main_frame, text=char, font=self.btn_font, bg=BTN_COLOR, bd=0,
                                 activebackground=BTN_ACTIVE,
                                 command=lambda ch=char: self.on_keypad(ch))
                 btn.place(x=x_pos, y=y_pos, width=btn_width, height=btn_height)
 
     def on_keypad(self, char):
+        current = self.amount_var.get()
         if char == '⌫':
-            current = self.amount_var.get()
             if len(current) > 1:
                 self.amount_var.set(current[:-1])
             else:
                 self.amount_var.set("0")
         elif char == '.':
-            if '.' not in self.amount_var.get():
-                self.amount_var.set(self.amount_var.get() + '.')
+            if '.' not in current:
+                self.amount_var.set(current + '.')
         else:
-            current = self.amount_var.get()
-            if current == "0":
+            if current == "0" and char != "0":
                 self.amount_var.set(char)
+            elif current == "0" and char == "0":
+                pass
             else:
                 self.amount_var.set(current + char)
 
     def on_submit(self):
-        print("Submitted:", self.amount_var.get())
+        try:
+            amount = float(self.amount_var.get())
+            if amount <= 0:
+                tk.messagebox.showerror("Invalid Input", "Amount must be greater than zero.")
+                return
+            success = database_manager.add_expense_record(self.category, amount)
+            if success:
+                print(f"Submitted expense: ₱{amount:.2f} for category '{self.category}'")
+                tk.messagebox.showinfo("Success", f"Expense of ₱{amount:,.2f} added to {self.category}!")
+                self.destroy()
+            else:
+                tk.messagebox.showerror("Database Error", "Failed to save expense record.")
+        except ValueError:
+            tk.messagebox.showerror("Invalid Input", "Please enter a valid numeric amount.")
 
-# ======== RoundedFrame class =========
 class RoundedFrame(tk.Frame):
-    def __init__(self, master=None, radius=25, bg="#FAD7A0", border_color="#000", border_width=2, **kwargs):
+    def __init__(self, master=None, radius=25, bg="#FFFDF6", border_color="#000", border_width=2, **kwargs):
         super().__init__(master, bg=bg, **kwargs)
+        self.master = master
         self.radius = radius
         self.bg = bg
         self.border_color = border_color
         self.border_width = border_width
-        self.canvas = tk.Canvas(self, bg=self.bg, highlightthickness=0)
+        self.config(bd=0, highlightthickness=0)
+        self.canvas = tk.Canvas(self, bg=self.master['bg'], highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.bind("<Configure>", self._draw_rounded_rect)
-
         self.category_buttons = []
         self.header_height = 60
+        self._x = 0
+        self._y = 0
+        self.canvas.bind("<ButtonPress-1>", self.start_move)
+        self.canvas.bind("<B1-Motion>", self.do_move)
+
+    def start_move(self, event):
+        if event.y < self.header_height:
+            self._x = event.x
+            self._y = event.y
+        else:
+            self._x = None
+            self._y = None
+
+    def do_move(self, event):
+        if self._x is not None and self._y is not None and event.y < self.header_height:
+            deltax = event.x - self._x
+            deltay = event.y - self._y
+            x = self.master.winfo_x() + deltax
+            y = self.master.winfo_y() + deltay
+            self.master.geometry(f"+{x}+{y}")
 
     def _draw_rounded_rect(self, event):
         self.canvas.delete("all")
@@ -126,139 +182,128 @@ class RoundedFrame(tk.Frame):
         h = self.winfo_height()
         r = self.radius
         header_height = self.header_height
-        header_color = "#FAD7A0"
+        header_color = BTN_COLOR
+        fill_color = self.bg
 
-        self.canvas.create_arc((0, 0, 2*r, 2*r), start=90, extent=90, fill=header_color, outline=header_color)
-        self.canvas.create_arc((w-2*r, 0, w, 2*r), start=0, extent=90, fill=header_color, outline=header_color)
-        self.canvas.create_rectangle((r, 0, w-r, header_height), fill=header_color, outline=header_color)
-        self.canvas.create_rectangle((0, r, w, header_height), fill=header_color, outline=header_color)
-        self.canvas.create_rectangle((0, header_height, w, h), fill=self.bg, outline=self.bg)
+        # Draw main rounded rectangle (window corners only)
+        self.canvas.create_arc((0, 0, 2 * r, 2 * r), start=90, extent=90, fill=fill_color, outline=fill_color)
+        self.canvas.create_arc((w - 2 * r, 0, w, 2 * r), start=0, extent=90, fill=fill_color, outline=fill_color)
+        self.canvas.create_arc((0, h - 2 * r, 2 * r, h), start=180, extent=90, fill=fill_color, outline=fill_color)
+        self.canvas.create_arc((w - 2 * r, h - 2 * r, w, h), start=270, extent=90, fill=fill_color, outline=fill_color)
+        self.canvas.create_rectangle((r, 0, w - r, h), fill=fill_color, outline=fill_color)
+        self.canvas.create_rectangle((0, r, w, h - r), fill=fill_color, outline=fill_color)
 
-        self.canvas.create_arc((0, 0, 2*r, 2*r), start=90, extent=90, style='arc', outline=self.border_color, width=self.border_width)
-        self.canvas.create_arc((w-2*r, 0, w, 2*r), start=0, extent=90, style='arc', outline=self.border_color, width=self.border_width)
-        self.canvas.create_arc((0, h-2*r, 2*r, h), start=180, extent=90, style='arc', outline=self.border_color, width=self.border_width)
-        self.canvas.create_arc((w-2*r, h-2*r, w, h), start=270, extent=90, style='arc', outline=self.border_color, width=self.border_width)
-        self.canvas.create_line(r, 0, w-r, 0, fill=self.border_color, width=self.border_width)
-        self.canvas.create_line(r, h, w-r, h, fill=self.border_color, width=self.border_width)
-        self.canvas.create_line(0, r, 0, h-r, fill=self.border_color, width=self.border_width)
-        self.canvas.create_line(w, r, w, h-r, fill=self.border_color, width=self.border_width)
+        # Draw the header section (straight, not rounded)
+        self.canvas.create_rectangle((0, 0, w, header_height), fill=header_color, outline=header_color)
 
-        self.canvas.create_text(w // 2, header_height // 2, text="CATEGORIES", font=("Times New Roman", 24, "bold"), fill="#000")
+        # Draw a horizontal line to separate content and header
+        self.canvas.create_line(0, header_height, w, header_height, fill=header_color, width=self.border_width)
 
+        # Header text and close button
+        self.canvas.create_text(w // 2, header_height // 2, text="CATEGORIES", font=("Times New Roman", 24, "bold"),
+                                fill="#000")
         close_btn = tk.Button(self.canvas, text="✕", font=("Arial", 28, "bold"), bg=header_color, bd=0,
                               activebackground=header_color, command=self.master.destroy)
         self.canvas.create_window(40, header_height // 2, window=close_btn, width=40, height=40)
+        self._draw_category_buttons()
 
-        category_names = ["Food", "Travel Fare", "Emergency Fund", "School Supply", "Others"]
+    def _draw_category_buttons(self):
+        for btn_canvas_instance, canvas_item_id in self.category_buttons:
+            btn_canvas_instance.destroy()
+        self.category_buttons.clear()
 
+        categories_to_display = EXPENSE_CATEGORIES
         emoji_map = {
             "Food": "🍽️",
             "Travel Fare": "🗺️",
-            "Emergency Fund": "🚨",
             "School Supply": "📚",
-            "Others": "🔲"
+            "Others": "🔲",
         }
-
         btn_width = 200
         btn_height = 120
         spacing_x = 30
         spacing_y = 40
         btn_radius = 20
+        start_y_for_categories = self.header_height + 90
+        w = self.winfo_width()
+        num_categories = len(categories_to_display)
+        current_y_pos = start_y_for_categories
 
-        for btn in self.category_buttons:
-            btn.destroy()
-        self.category_buttons.clear()
+        def open_category_input_window(category_name):
+            ExpensesInputApp(self.master, category=category_name)
 
-        def open_category_window(category_name):
-            # Show SavingsInputApp for all categories
-            if category_name in ["Food", "Travel Fare", "Emergency Fund", "School Supply", "Others"]:
-                SavingsInputApp(self.master, category=category_name)
-            else:
-                new_win = tk.Toplevel(self)
-                new_win.title(category_name)
-                new_win.geometry("400x300")
-                new_win.configure(bg="#FFFDF6")
+        def draw_rounded_rect_on_canvas(canvas_obj, x1, y1, x2, y2, r, color):
+            canvas_obj.create_arc(x1, y1, x1 + 2 * r, y1 + 2 * r, start=90, extent=90, fill=color, outline=color)
+            canvas_obj.create_arc(x2 - 2 * r, y1, x2, y1 + 2 * r, start=0, extent=90, fill=color, outline=color)
+            canvas_obj.create_arc(x1, y2 - 2 * r, x1 + 2 * r, y2, start=180, extent=90, fill=color, outline=color)
+            canvas_obj.create_arc(x2 - 2 * r, y2 - 2 * r, x2, y2, start=270, extent=90, fill=color, outline=color)
+            canvas_obj.create_rectangle(x1 + r, y1, x2 - r, y2, fill=color, outline=color)
+            canvas_obj.create_rectangle(x1, y1 + r, x2, y2 - r, fill=color, outline=color)
 
-                label = tk.Label(new_win, text=f"Welcome to {category_name} category!",
-                                 font=("Arial", 16), bg="#FFFDF6")
-                label.pack(pady=40)
-
-        def draw_rounded_rect(canvas, x1, y1, x2, y2, r, color):
-            canvas.create_arc(x1, y1, x1 + 2 * r, y1 + 2 * r, start=90, extent=90, fill=color, outline=color)
-            canvas.create_arc(x2 - 2 * r, y1, x2, y1 + 2 * r, start=0, extent=90, fill=color, outline=color)
-            canvas.create_arc(x1, y2 - 2 * r, x1 + 2 * r, y2, start=180, extent=90, fill=color, outline=color)
-            canvas.create_arc(x2 - 2 * r, y2 - 2 * r, x2, y2, start=270, extent=90, fill=color, outline=color)
-            canvas.create_rectangle(x1 + r, y1, x2 - r, y2, fill=color, outline=color)
-            canvas.create_rectangle(x1, y1 + r, x2, y2 - r, fill=color, outline=color)
-
-        def create_category_button(x_pos, y_pos, name):
-            btn_canvas = tk.Canvas(self.canvas, width=btn_width, height=btn_height, bg="#FFFDF6", highlightthickness=0, cursor="hand2")
-
-            def draw_button(bg_color):
+        def create_category_button_internal(x_pos, y_pos, name):
+            btn_canvas = tk.Canvas(self.canvas, width=btn_width, height=btn_height, bg="#FFFDF6", highlightthickness=0,
+                                   cursor="hand2")
+            def draw_button_state(bg_color):
                 btn_canvas.delete("all")
-                draw_rounded_rect(btn_canvas, 0, 0, btn_width, btn_height, btn_radius, bg_color)
-
+                draw_rounded_rect_on_canvas(btn_canvas, 0, 0, btn_width, btn_height, btn_radius, bg_color)
                 emoji_font = ("Segoe UI Emoji", 50)
-                y_offset_map = {
-                    "Food": 50,
-                    "Travel Fare": 50,
-                    "Emergency Fund": 45,
-                    "School Supply": 45,
-                    "Others": 45
-                }
-
+                emoji_y_pos = btn_height * 0.4
+                text_y_pos = btn_height * 0.8
                 btn_canvas.create_text(
                     btn_width // 2,
-                    y_offset_map[name],
-                    text=emoji_map[name],
+                    emoji_y_pos,
+                    text=emoji_map.get(name, "❓"),
                     font=emoji_font,
                     anchor="center"
                 )
-
                 btn_canvas.create_text(
                     btn_width // 2,
-                    100,
+                    text_y_pos,
                     text=name,
                     font=("Arial", 14),
                     anchor="center"
                 )
+            draw_button_state(BTN_COLOR)
+            btn_canvas.bind("<Button-1>", lambda e: open_category_input_window(name))
+            btn_canvas.bind("<Enter>", lambda e: draw_button_state(BTN_ACTIVE))
+            btn_canvas.bind("<Leave>", lambda e: draw_button_state(BTN_COLOR))
+            canvas_item_id = self.canvas.create_window(x_pos, y_pos, window=btn_canvas)
+            self.category_buttons.append((btn_canvas, canvas_item_id))
 
-            draw_button("#FAD7A0")
-            btn_canvas.bind("<Button-1>", lambda e: open_category_window(name))
-            btn_canvas.bind("<Enter>", lambda e: draw_button("#D6EAF8"))
-            btn_canvas.bind("<Leave>", lambda e: draw_button("#FAD7A0"))
+        if num_categories == 4:
+            row_capacity_2x2 = 2
+            total_width_2x2_row = row_capacity_2x2 * btn_width + (row_capacity_2x2 - 1) * spacing_x
+            start_x_offset_2x2 = (w - total_width_2x2_row) // 2 + btn_width // 2
+            for r in range(2):
+                for c in range(row_capacity_2x2):
+                    idx = r * row_capacity_2x2 + c
+                    if idx < num_categories:
+                        name = categories_to_display[idx]
+                        x_pos = start_x_offset_2x2 + c * (btn_width + spacing_x)
+                        y_pos = current_y_pos + r * (btn_height + spacing_y)
+                        create_category_button_internal(x_pos, y_pos, name)
+        else:
+            row_capacity_general = 3
+            for i in range(0, num_categories, row_capacity_general):
+                row_categories = categories_to_display[i: i + row_capacity_general]
+                current_row_width = len(row_categories) * btn_width + (len(row_categories) - 1) * spacing_x
+                current_row_start_x = (w - current_row_width) // 2 + btn_width // 2
+                for j, name in enumerate(row_categories):
+                    x_pos = current_row_start_x + j * (btn_width + spacing_x)
+                    create_category_button_internal(x_pos, current_y_pos, name)
+                current_y_pos += btn_height + spacing_y
 
-            self.canvas.create_window(x_pos, y_pos, window=btn_canvas)
-            self.category_buttons.append(btn_canvas)
+def create_categories_window():
+    root = tk.Tk()
+    root.title("Categories")
+    root.configure(bg="#FFFDF6")
+    root.geometry("750x450")
+    root.resizable(False, False)
+    root.overrideredirect(True)
+    center_toplevel_window(root)
+    main_frame = RoundedFrame(root, radius=30, bg="#FFFDF6", border_color="#000", border_width=2)
+    main_frame.place(x=0, y=0, relwidth=1, relheight=1)
+    root.mainloop()
 
-        row1_count = 3
-        total_width_row1 = row1_count * btn_width + (row1_count - 1) * spacing_x
-        start_x_row1 = (w - total_width_row1) // 2 + btn_width // 2
-        y_pos_row1 = header_height + 70
-
-        row2_count = 2
-        total_width_row2 = row2_count * btn_width + (row2_count - 1) * spacing_x
-        start_x_row2 = (w - total_width_row2) // 2 + btn_width // 2
-        y_pos_row2 = y_pos_row1 + btn_height + spacing_y
-
-        for i in range(row1_count):
-            name = category_names[i]
-            x_pos = start_x_row1 + i * (btn_width + spacing_x)
-            create_category_button(x_pos, y_pos_row1, name)
-
-        for i in range(row2_count):
-            name = category_names[row1_count + i]
-            x_pos = start_x_row2 + i * (btn_width + spacing_x)
-            create_category_button(x_pos, y_pos_row2, name)
-
-# ======== Main window =========
-root = tk.Tk()
-root.title("Categories")
-root.configure(bg="#FFFDF6")
-root.geometry("800x500")
-root.resizable(False, False)
-
-main_frame = RoundedFrame(root, radius=30, bg="#FFFDF6", border_color="#000", border_width=2)
-main_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER, width=750, height=420)
-
-root.mainloop()
+if __name__ == "__main__":
+    create_categories_window()
