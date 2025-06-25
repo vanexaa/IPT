@@ -221,9 +221,9 @@ def update_pie_chart_section(event=None):
 
     # Watermark
     pie_chart_section_canvas.create_text(current_width / 2, current_height / 2, text="₱",
-                       font=("Arial", int(current_height * 0.7), "bold"), fill="#f0f0e0", anchor="center",
+                       font=("Arial", int(current_height * 0.7), "bold"), fill="#f0f0f0", anchor="center",
                        tags="pie_watermark")
-    pie_chart_section_canvas.tag_lower("pie_watermark")
+    pie_chart_section_canvas.tag_lower("")
 
     # Get selected month name, convert to number using the global widget reference
     selected_month_name = month_combo_widget_ref.get()
@@ -299,7 +299,7 @@ def update_pie_chart_section(event=None):
             ax.legend(wedges, labels, title="Categories", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1),
                       frameon=False, fontsize=FONT_SUBTEXT[1], title_fontsize=FONT_SECTION[1])
 
-        center_text = f"Expense Breakdown\nTotal: ₱{total_expenses_for_month:,.2f}"
+        center_text = f"\nTotal: ₱{total_expenses_for_month:,.2f}"
 
         ax.text(0, 0, center_text, horizontalalignment='center', verticalalignment='center',
                 fontsize=FONT_SECTION[1], color='gray', transform=ax.transAxes)
@@ -357,7 +357,7 @@ def update_recent_transaction_box(event=None):
 
     # Watermark (re-create as it was deleted)
     recent_transaction_canvas.create_text(current_width / 2, current_height / 2, text="₱",
-                                          font=("Arial", int(current_height * 0.7), "bold"), fill="#f0f0e0",
+                                          font=("Arial", int(current_height * 0.7), "bold"), fill="#f0f0f0",
                                           anchor="center", tags="watermark")
     recent_transaction_canvas.tag_lower("watermark")
 
@@ -604,7 +604,7 @@ def create_total_expenses_app():
         state="readonly",
         width=15,
         font=FONT_SUBTEXT,
-        justify="center"
+        justify="center",
     )
     if recent_transaction_category_combobox_var.get() not in categories_for_filter:
         recent_transaction_category_combobox_var.set("All Categories")

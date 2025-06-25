@@ -1,31 +1,20 @@
 import tkinter as tk
 
-class FullscreenContentApp:
-    def __init__(self, master):
-        self.master = master
-        master.title("Borderless Window") # This title won't be shown
+root = tk.Tk()
 
-        # Completely remove the native title bar and window borders
-        master.overrideredirect(True)
+text = tk.Text(root, wrap='word', width=40, height=10)
+text.pack()
 
-        # Set an initial size (or it might be very small)
-        master.geometry("800x600")
+# Create an invisible scrollbar
+scrollbar = tk.Scrollbar(root)
+scrollbar.pack_forget()  # Don't add it to the layout
 
-        # Optional: Make it full screen
-        # master.attributes('-fullscreen', True)
+# Connect the scrollbar to the text widget
+text.config(yscrollcommand=scrollbar.set)
+scrollbar.config(command=text.yview)
 
-        # Your application content goes directly into the root window
-        # without a separate title bar frame
-        label = tk.Label(master, text="This window has no title bar!",
-                         font=("Arial", 20), bg="lightblue")
-        label.pack(expand=True, fill="both")
+# Add sample content
+for i in range(50):
+    text.insert(tk.END, f"Line {i+1}\n")
 
-        # Since there's no title bar, you need a way to close the window
-        close_button = tk.Button(master, text="Close Window", command=master.destroy,
-                                 font=("Arial", 14), bg="red", fg="white")
-        close_button.pack(pady=20)
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = FullscreenContentApp(root)
-    root.mainloop()
+root.mainloop()

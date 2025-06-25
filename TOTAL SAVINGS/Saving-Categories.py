@@ -20,6 +20,7 @@ BORDER_COLOR = "#000"
 FONT_FAMILY = "Georgia"
 SAVINGS_CATEGORIES = ["Emergency Fund", "Future Purchase", "Personal Goals", "General Savings"]
 
+
 def center_toplevel_window(window):
     window.update_idletasks()
     window_width = window.winfo_width()
@@ -29,6 +30,7 @@ def center_toplevel_window(window):
     x = (screen_width // 2) - (window_width // 2)
     y = (screen_height // 2) - (window_height // 2)
     window.geometry(f"+{x}+{y}")
+
 
 class SavingsInputApp(tk.Toplevel):
     def __init__(self, master=None, category="General Savings"):
@@ -58,36 +60,84 @@ class SavingsInputApp(tk.Toplevel):
         savings_label.place(x=420, y=25)
         title_label = tk.Label(main_frame, text=self.category, font=self.title_font, bg=BG_COLOR, fg=BORDER_COLOR)
         title_label.place(relx=0.5, y=60, anchor="center")
+
+        # Keypad button properties for calculation
+        btn_width = 60
+        btn_height = 40
+        padding_x = 10  # Horizontal spacing between keypad buttons
+        padding_y = 8   # Vertical spacing between keypad rows
+
+        # Calculate the total width of the keypad (3 buttons + 2 padding_x)
+        total_keypad_width = 3 * btn_width + 2 * padding_x # This will be 200
+
+        # Calculate absolute x position to center the keypad within main_frame
+        keypad_start_x_abs = (520 - total_keypad_width) // 2
+
+        # Adjusted keypad_start_y to move it further down
+        # Start the first row of keypad buttons lower
+        keypad_start_y = 160 # Increased from 170
+
+        # --- Input Field and Check Button Positioning ---
+        # Input field width to cover '1' and '2' button space
+        entry_frame_width = (2 * btn_width) + padding_x # This will be 130
+        entry_height = 50
+
+        # Check button width (same as keypad button width)
+        check_btn_width = btn_width
+        check_btn_height = 45 # Slightly taller for visual emphasis, as per previous
+
+        # Determine x-position for the entry frame
+        # It starts at the same horizontal line as the keypad's first column
+        entry_frame_x = keypad_start_x_abs
+
+        # Determine x-position for the check button
+        # It should align with the 3rd column of the keypad
+        # X-position for the start of the 3rd column is keypad_start_x_abs + 2 * (btn_width + padding_x)
+        check_btn_x = keypad_start_x_abs + 2 * (btn_width + padding_x)
+
+        # Calculate y-positions for the input row, ensuring consistent vertical spacing
+        # We want the vertical gap between input bottom and keypad top to be padding_y
+        # Bottom of entry frame: entry_frame_y + entry_height
+        # Top of keypad: keypad_start_y
+        # So, entry_frame_y + entry_height + padding_y = keypad_start_y
+        # entry_frame_y = keypad_start_y - entry_height - padding_y
+        entry_frame_y = keypad_start_y - entry_height - padding_y # This will be 190 - 50 - 8 = 132
+
+        # Center the check button vertically with the entry frame
+        check_btn_y = entry_frame_y + (entry_height - check_btn_height) // 2
+
+
         entry_frame = tk.Frame(main_frame, bg=BTN_COLOR, bd=2, relief="groove")
-        entry_frame.place(relx=0.5, y=110, anchor="center", width=220, height=50)
+        entry_frame.place(x=entry_frame_x, y=entry_frame_y, width=entry_frame_width, height=entry_height)
+
         currency_label = tk.Label(entry_frame, text="₱", font=self.label_font, bg=BTN_COLOR)
         currency_label.place(x=10, y=8)
         self.amount_var = tk.StringVar(value="0")
         amount_entry = tk.Entry(entry_frame, textvariable=self.amount_var, font=self.label_font,
                                 bd=0, bg=BTN_COLOR, justify="right")
-        amount_entry.place(x=40, y=8, width=110, height=30)
+        # Adjust entry width based on currency label and frame width
+        amount_entry.place(x=40, y=8, width=entry_frame_width - 50, height=30)
+
         def update_scroll(*args):
             amount_entry.xview_moveto(1)
+
         self.amount_var.trace_add("write", update_scroll)
+
         check_btn = tk.Button(main_frame, text="✔", font=self.btn_font, bg=BTN_COLOR, bd=0,
                               activebackground=BTN_ACTIVE, command=self.on_submit)
-        check_btn.place(x=370, y=85, width=45, height=45)
+        check_btn.place(x=check_btn_x, y=check_btn_y, width=check_btn_width, height=check_btn_height)
+
+
+        # --- Keypad Buttons ---
         btns = [
             ['7', '8', '9'],
             ['4', '5', '6'],
             ['1', '2', '3'],
             ['.', '0', '⌫']
         ]
-        btn_width = 60
-        btn_height = 40
-        padding_x = 10
-        padding_y = 8
-        total_width = 3 * btn_width + 2 * padding_x
-        keypad_start_x = (520 - total_width) // 2
-        keypad_start_y = 170
         for r, row in enumerate(btns):
             for c, char in enumerate(row):
-                x_pos = keypad_start_x + c * (btn_width + padding_x)
+                x_pos = keypad_start_x_abs + c * (btn_width + padding_x)
                 y_pos = keypad_start_y + r * (btn_height + padding_y)
                 btn = tk.Button(main_frame, text=char, font=self.btn_font, bg=BTN_COLOR, bd=0,
                                 activebackground=BTN_ACTIVE,
@@ -128,14 +178,17 @@ class SavingsInputApp(tk.Toplevel):
         except ValueError:
             tk.messagebox.showerror("Invalid Input", "Please enter a valid numeric amount.")
 
+
 class RoundedFrame(tk.Frame):
     def __init__(self, master=None, radius=25, bg="#FFFDF6", border_color="#000", border_width=2, **kwargs):
         super().__init__(master, bg=bg, **kwargs)
+        self.master = master  # Store master for geometry adjustments
         self.radius = radius
         self.bg = bg
         self.border_color = border_color
         self.border_width = border_width
-        self.canvas = tk.Canvas(self, bg=self.bg, highlightthickness=0)
+        self.config(bd=0, highlightthickness=0)
+        self.canvas = tk.Canvas(self, bg=self.master['bg'], highlightthickness=0)  # Canvas matches master's bg
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.bind("<Configure>", self._draw_rounded_rect)
         self.category_buttons = []
@@ -146,12 +199,18 @@ class RoundedFrame(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.do_move)
 
     def start_move(self, event):
-        if event.y < self.header_height:
+        # Allow dragging only from the header area
+        if 0 <= event.y < self.header_height:
             self._x = event.x
             self._y = event.y
+        else:
+            self._x = None
+            self._y = None
 
     def do_move(self, event):
-        if self._x is not None and self._y is not None and event.y < self.header_height:
+        if self._x is not None and self._y is not None:  # Check if a drag started
+            # Ensure movement is constrained to the header area for initial _y,
+            # but allow dragging the window
             deltax = event.x - self._x
             deltay = event.y - self._y
             x = self.master.winfo_x() + deltax
@@ -165,22 +224,29 @@ class RoundedFrame(tk.Frame):
         r = self.radius
         header_height = self.header_height
         header_color = BTN_COLOR
+        fill_color = self.bg  # Use self.bg for the main frame fill
 
-        # Draw rounded corners for the main window
-        self.canvas.create_arc((0, 0, 2 * r, 2 * r), start=90, extent=90, fill=self.bg, outline=self.bg)
-        self.canvas.create_arc((w - 2 * r, 0, w, 2 * r), start=0, extent=90, fill=self.bg, outline=self.bg)
-        self.canvas.create_arc((0, h - 2 * r, 2 * r, h), start=180, extent=90, fill=self.bg, outline=self.bg)
-        self.canvas.create_arc((w - 2 * r, h - 2 * r, w, h), start=270, extent=90, fill=self.bg, outline=self.bg)
-        self.canvas.create_rectangle((r, 0, w - r, h), fill=self.bg, outline=self.bg)
-        self.canvas.create_rectangle((0, r, w, h - r), fill=self.bg, outline=self.bg)
+        # Draw main rounded rectangle (overall window shape) - NO OUTLINE
+        # These remain the same for the overall window shape
+        self.canvas.create_arc((0, 0, 2 * r, 2 * r), start=90, extent=90, fill=fill_color, outline="")
+        self.canvas.create_arc((w - 2 * r, 0, w, 2 * r), start=0, extent=90, fill=fill_color, outline="")
+        self.canvas.create_arc((0, h - 2 * r, 2 * r, h), start=180, extent=90, fill=fill_color, outline="")
+        self.canvas.create_arc((w - 2 * r, h - 2 * r, w, h), start=270, extent=90, fill=fill_color, outline="")
+        self.canvas.create_rectangle((r, 0, w - r, h), fill=fill_color, outline="")
+        self.canvas.create_rectangle((0, r, w, h - r), fill=fill_color, outline="")
 
-        # Draw the header as a straight rectangle (not rounded)
-        self.canvas.create_rectangle((0, 0, w, header_height), fill=header_color, outline=header_color)
+        # Draw the header section (the 'navbar') at the top - NO OUTLINE
+        # Adjusted y-coordinates to start from 0 for maximum upper position
+        self.canvas.create_rectangle(0, 0, w, header_height - r, fill=header_color, outline="")
+        self.canvas.create_rectangle(r, 0, w - r, header_height, fill=header_color, outline="")
 
-        # Draw a horizontal line to separate content and header
-        self.canvas.create_line(0, header_height, w, header_height, fill=header_color, width=self.border_width)
+        # Bottom rounded corners of the header (now truly at the bottom of the header, which is at y=header_height)
+        self.canvas.create_arc(0, header_height - 2 * r, 2 * r, header_height, start=180, extent=90, fill=header_color,
+                               outline="")
+        self.canvas.create_arc(w - 2 * r, header_height - 2 * r, w, header_height, start=270, extent=90,
+                               fill=header_color, outline="")
 
-        # Header text and close button
+        # Header text and close button (adjusted y-position to be within the new header bounds)
         self.canvas.create_text(w // 2, header_height // 2, text="CATEGORIES", font=("Times New Roman", 24, "bold"),
                                 fill="#000")
         close_btn = tk.Button(self.canvas, text="✕", font=("Arial", 28, "bold"), bg=header_color, bd=0,
@@ -190,12 +256,14 @@ class RoundedFrame(tk.Frame):
 
     def _draw_category_buttons(self):
         for btn_item in self.category_buttons:
+            # Safely destroy the widget if it exists before deleting the canvas item
             window_widget = self.canvas.itemcget(btn_item, "window")
             if window_widget:
                 widget_instance = self.nametowidget(window_widget)
                 widget_instance.destroy()
             self.canvas.delete(btn_item)
         self.category_buttons.clear()
+
         categories_to_display = SAVINGS_CATEGORIES
         emoji_map = {
             "Emergency Fund": "🚨",
@@ -208,7 +276,7 @@ class RoundedFrame(tk.Frame):
         spacing_x = 30
         spacing_y = 40
         btn_radius = 20
-        start_y_for_categories = self.header_height + 90
+        start_y_for_categories = self.header_height + 90  # Buttons start below the header
         w = self.winfo_width()
         num_categories = len(categories_to_display)
         current_y_pos = start_y_for_categories
@@ -217,6 +285,8 @@ class RoundedFrame(tk.Frame):
             SavingsInputApp(self.master, category=category_name)
 
         def draw_rounded_rect_on_canvas(canvas, x1, y1, x2, y2, r, color):
+            # These are for the buttons, and the outline is explicitly set to color
+            # to match the button fill, effectively making them outline-free black.
             canvas.create_arc(x1, y1, x1 + 2 * r, y1 + 2 * r, start=90, extent=90, fill=color, outline=color)
             canvas.create_arc(x2 - 2 * r, y1, x2, y1 + 2 * r, start=0, extent=90, fill=color, outline=color)
             canvas.create_arc(x1, y2 - 2 * r, x1 + 2 * r, y2, start=180, extent=90, fill=color, outline=color)
@@ -227,6 +297,7 @@ class RoundedFrame(tk.Frame):
         def create_category_button_internal(x_pos, y_pos, name):
             btn_canvas = tk.Canvas(self.canvas, width=btn_width, height=btn_height, bg="#FFFDF6", highlightthickness=0,
                                    cursor="hand2")
+
             def draw_button(bg_color):
                 btn_canvas.delete("all")
                 draw_rounded_rect_on_canvas(btn_canvas, 0, 0, btn_width, btn_height, btn_radius, bg_color)
@@ -247,6 +318,7 @@ class RoundedFrame(tk.Frame):
                     font=("Arial", 14),
                     anchor="center"
                 )
+
             draw_button(BTN_COLOR)
             btn_canvas.bind("<Button-1>", lambda e: open_category_input_window(name))
             btn_canvas.bind("<Enter>", lambda e: draw_button(BTN_ACTIVE))
@@ -277,17 +349,21 @@ class RoundedFrame(tk.Frame):
                     create_category_button_internal(x_pos, current_y_pos, name)
                 current_y_pos += btn_height + spacing_y
 
+
 def create_categories_window():
     root = tk.Tk()
     root.title("Categories")
     root.configure(bg="#FFFDF6")
-    root.geometry("800x500")
+    root.geometry("750x450")  # Reverted window size
     root.resizable(False, False)
     root.overrideredirect(True)
     center_toplevel_window(root)
+    # Adjust main_frame placement to be at the very top (x=0, y=0)
     main_frame = RoundedFrame(root, radius=30, bg="#FFFDF6", border_color="#000", border_width=2)
-    main_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER, width=750, height=420)
+    main_frame.place(x=0, y=0, relwidth=1, relheight=1)  # Place it to fill the root window entirely
     root.mainloop()
 
+
 if __name__ == "__main__":
+    database_manager.initialize_db()  # Ensure database is initialized for testing purposes
     create_categories_window()
