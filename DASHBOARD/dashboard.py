@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 from datetime import datetime
-import calendar  # Import calendar module
+import calendar
 
 # --- Path setup for database_manager.py ---
 # Get the directory of the current script (dashboard.py is in DASHBOARD/)
@@ -22,9 +22,7 @@ if database_folder_path not in sys.path:
 # ------------------------------------------
 
 # Import specific functions from database_manager
-import database_manager # Keep the direct import for simplicity as requested
-
-# Now you can directly call database_manager.get_username_by_id
+import database_manager
 
 # --- Global Font Loading ---
 try:
@@ -48,12 +46,16 @@ FONT_SUBTEXT = ("Playfair Display", 12)
 FONT_AMOUNT = ("Georgia", 24, "underline")
 FONT_TRANSACTION = ("Playfair Display", 11)
 FONT_BUTTON = ("Arial", 25)
-FONT_WELCOME = ("Playfair Display", 22, "bold")
+FONT_WELCOME = ("Playfair Display", 22, "bold") # This will be used for the welcome message
 
 BAR_COLOR = "#fdf6e3"  # Background of the bar chart canvas
 BAR_FILL_COLOR = "#ffa726"  # Color of the actual bars
 
 LOGO_SIZE_SIDEBAR = (150, 100)
+ICON_SIZE = (48, 48) # Define a size for menu icons
+
+# Global dictionary to store PhotoImage objects for sidebar icons
+sidebar_icons = {}
 
 # --- Global Tkinter StringVars for comboboxes ---
 expense_month_var = None
@@ -73,16 +75,19 @@ savings_month_combo_widget_ref = None
 # --- Global references for labels within the boxes that update frequently ---
 expense_amount_lbl_ref = None
 savings_amount_lbl_ref = None
-welcome_label_ref = None
+welcome_label_ref = None # Reference to the welcome label
 
 # --- Global canvases for bar charts (created once) ---
 expense_bar_canvas_ref = None
 savings_bar_canvas_ref = None
 
 # --- Global variable to store the logged-in user's ID and Username ---
-logged_in_user_id = None # Changed default to None, as it will be passed from login
+logged_in_user_id = None
 logged_in_username = "Guest" # Default value if no user is passed
 
+right_container = None
+right_canvas = None
+right_content_frame = None
 
 def draw_bottom_rounded_rect(canvas, x, y, w, h, r, color):
     canvas.create_rectangle(x, y, x + w, y + r, fill=color, outline=color)
@@ -229,6 +234,7 @@ def update_left_box_canvas(event, box_canvas, box_type):
 
     current_display_year = datetime.now().year  # Assuming current year for dashboard
 
+
     # --- Fetch Data ---
     total_amount = get_total_func(current_display_month_num, current_display_year)
     daily_data = get_daily_func(current_display_month_num, current_display_year)
@@ -262,39 +268,120 @@ def update_left_box_canvas(event, box_canvas, box_type):
     # Now, draw bars on the bar_canvas_ref itself
     bar_canvas_ref.update_idletasks()  # Ensure it's sized before drawing bars
     create_bar(bar_canvas_ref, daily_data)
+def update_right_transactions_frame():
+    global right_content_frame
+    for widget in right_content_frame.winfo_children():
+        widget.destroy()
+    # Header
+    header_frame = tk.Frame(right_content_frame, bg=COLOR_CANVAS_BAR)
+    header_frame.pack(fill="x", pady=(10, 0))
+    tk.Label(header_frame, text="Recent Transactions", font=FONT_SECTION, bg=COLOR_CANVAS_BAR, anchor="w").pack(side="left", padx=(10, 0))
+    # Table headers
+    table_header = tk.Frame(right_content_frame, bg=COLOR_CANVAS_BAR)
+    table_header.pack(fill="x", pady=(10, 0))
+    tk.Label(table_header, text="Category", font=FONT_SUBTEXT, bg=COLOR_CANVAS_BAR, width=12, anchor="w").pack(side="left", padx=(10, 0))
+    tk.Label(table_header, text="Date", font=FONT_SUBTEXT, bg=COLOR_CANVAS_BAR, width=14, anchor="center").pack(side="left")
+    tk.Label(table_header, text="Amount", font=FONT_SUBTEXT, bg=COLOR_CANVAS_BAR, width=10, anchor="e").pack(side="left")
+    # Transactions
+    # MODIFIED: Database call needs to be filtered by user_id if that's how your transactions are stored.
+    # Assuming for now that get_recent_combined_transactions doesn't use user_id,
+    # but if it did, it would be database_manager.get_recent_combined_transactions(logged_in_user_id, limit=20)
+    recent_transactions = database_manager.get_recent_combined_transactions(limit=20)
+    if not recent_transactions:
+        tk.Label(right_content_frame, text="No Recent Transactions", font=FONT_SUBTEXT, bg=COLOR_CANVAS_BAR, fg="gray").pack(pady=20)
+    else:
+        for idx, (trans_date_str, trans_type, category, amount, notes) in enumerate(recent_transactions):
+            row = tk.Frame(right_content_frame, bg=COLOR_CANVAS_BAR)
+            row.pack(fill="x", pady=2)
+            try:
+                dt_obj = datetime.strptime(trans_date_str, "%Y-%m-%d %H:%M:%S")
+                display_date = dt_obj.strftime("%b %d, %Y")
+            except ValueError:
+                display_date = "Invalid Date"
+            amount_color = "red" if trans_type == "Expense" else "green"
+            display_amount = f"₱{amount:,.2f}"
+            if trans_type == "Expense":
+                display_amount = f"-{display_amount}"
+            tk.Label(row, text=category, font=FONT_TRANSACTION, bg=COLOR_CANVAS_BAR, width=12, anchor="w").pack(side="left", padx=(10, 0))
+            tk.Label(row, text=display_date, font=FONT_TRANSACTION, bg=COLOR_CANVAS_BAR, width=14, anchor="center").pack(side="left")
+            tk.Label(row, text=display_amount, font=FONT_TRANSACTION, bg=COLOR_CANVAS_BAR, fg=amount_color, width=10, anchor="e").pack(side="left")
 
+def create_scrollable_transactions_box(parent, width, height):
+    container = tk.Frame(parent, bg=COLOR_CANVAS_BAR)
+    container.pack_propagate(False)
+    container.grid_propagate(False)
+    container.config(width=width, height=height)
 
-def update_right_canvas(event=None):  # event is optional now
-    """
-    Updates the content of the right-side recent transactions box.
-    """
+    canvas = tk.Canvas(container, bg=COLOR_CANVAS_BAR, highlightthickness=0, width=width, height=height)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scrollbar.pack(side="right", fill="y")
+    scrollbar.pack_forget()
+
+    content_frame = tk.Frame(canvas, bg=COLOR_CANVAS_BAR)
+    window_id = canvas.create_window((0, 0), window=content_frame, anchor="nw")
+
+    def on_frame_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        if content_frame.winfo_height() > height:
+            scrollbar.pack(side="right", fill="y")
+        else:
+            scrollbar.pack_forget()
+
+    content_frame.bind("<Configure>", on_frame_configure)
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+    return container, canvas, content_frame
+
+def update_right_canvas(event=None):
     global right_transaction_canvas_ref
-
     if not right_transaction_canvas_ref:
         return
-
     right_transaction_canvas_ref.delete("all")
     current_width = right_transaction_canvas_ref.winfo_width() if event is None else event.width
     current_height = right_transaction_canvas_ref.winfo_height() if event is None else event.height
-
     if current_width <= 1 or current_height <= 1:
-        return  # Canvas not yet properly sized
+        return
+
+    left_pad = 18
+    right_pad = 18
 
     draw_rounded_rect(right_transaction_canvas_ref, 0, 0, current_width, current_height, 20, COLOR_CANVAS_BAR)
-    right_transaction_canvas_ref.create_text(20, 20, anchor="nw", text="Recent Transactions", font=FONT_SECTION,
-                                             fill="black")
-    right_transaction_canvas_ref.create_text(current_width - 30, 60, anchor="ne", text="Amount", font=FONT_SUBTEXT,
-                                             fill="black")
-    right_transaction_canvas_ref.create_text(20, 60, anchor="nw", text="Category & Date", font=FONT_SUBTEXT,
-                                             fill="black")
+
+    # Title: left-aligned with padding
+    right_transaction_canvas_ref.create_text(
+        left_pad, 40,
+        anchor="w",
+        text="Recent Transactions",
+        font=FONT_SECTION,
+        fill="black"
+    )
+
+    # Add more space below the title
+    header_y = 80
+    row_start_y = 107
+    line_height = 28
+
+    col1_x = left_pad  # Category (left-aligned)
+    col2_x = current_width // 2  # Date (centered)
+    col3_x = current_width - right_pad  # Amount (right-aligned)
+
+    # Draw headers
+    right_transaction_canvas_ref.create_text(col1_x, header_y, anchor="w", text="Category", font=FONT_SUBTEXT, fill="black")
+    right_transaction_canvas_ref.create_text(col2_x, header_y, anchor="center", text="Date", font=FONT_SUBTEXT, fill="black")
+    right_transaction_canvas_ref.create_text(col3_x, header_y, anchor="e", text="Amount", font=FONT_SUBTEXT, fill="black")
 
     # Fetch recent transactions (combined expenses and savings)
-    recent_transactions = database_manager.get_recent_combined_transactions(limit=10)  # Get top 10
-
-    y_offset = 100
-    line_height = 28
-    display_limit = int((current_height - y_offset - 30) / line_height)  # Max items that can fit
-
+    # MODIFIED: If get_recent_combined_transactions uses user_id, pass it here:
+    # recent_transactions = database_manager.get_recent_combined_transactions(logged_in_user_id, limit=10)
+    recent_transactions = database_manager.get_recent_combined_transactions(limit=10) # Using existing function
+    y_offset = row_start_y
+    display_limit = int((current_height - y_offset - 30) / line_height)
     if not recent_transactions:
         right_transaction_canvas_ref.create_text(
             current_width / 2, y_offset + line_height,
@@ -307,41 +394,36 @@ def update_right_canvas(event=None):  # event is optional now
         for idx, (trans_date_str, trans_type, category, amount, notes) in enumerate(recent_transactions):
             if idx >= display_limit:
                 break
-
             try:
                 dt_obj = datetime.strptime(trans_date_str, "%Y-%m-%d %H:%M:%S")
                 display_date = dt_obj.strftime("%b %d, %Y")
             except ValueError:
                 display_date = "Invalid Date"
-
-            # Determine color based on transaction type
             amount_color = "red" if trans_type == "Expense" else "green"
             display_amount = f"₱{amount:,.2f}"
             if trans_type == "Expense":
                 display_amount = f"-{display_amount}"
-            # No explicit '+' for savings, as it's implied positive. If you want it, add:
-            # else:
-            #      display_amount = f"+{display_amount}"
-
-            display_text = f"• {category} ({display_date})"
-
-            right_transaction_canvas_ref.create_text(30, y_offset, anchor="w", text=display_text, font=FONT_TRANSACTION,
-                                                     fill="black")
-            right_transaction_canvas_ref.create_text(current_width - 30, y_offset, anchor="e", text=display_amount,
-                                                     font=FONT_TRANSACTION, fill=amount_color)
+            tk.Label(right_transaction_canvas_ref, text=category, font=FONT_TRANSACTION, bg=COLOR_CANVAS_BAR, fg="black").place(x=col1_x, y=y_offset, anchor="w")
+            tk.Label(right_transaction_canvas_ref, text=display_date, font=FONT_TRANSACTION, bg=COLOR_CANVAS_BAR, fg="black").place(x=col2_x, y=y_offset, anchor="center")
+            tk.Label(right_transaction_canvas_ref, text=display_amount, font=FONT_TRANSACTION, bg=COLOR_CANVAS_BAR, fg=amount_color).place(x=col3_x, y=y_offset, anchor="e")
             y_offset += line_height
-
 
 def draw_navbar_content(event):
     """Draws the custom rounded rectangle and places content on the top right header canvas."""
-    global navbar_canvas_ref
+    global navbar_canvas_ref, logged_in_username # Access logged_in_username
     navbar_canvas_ref.delete("all")
     draw_bottom_rounded_rect(navbar_canvas_ref, 0, 0, event.width, event.height, 20, COLOR_NAVBAR)
 
     brand_label = tk.Label(navbar_canvas_ref, text="TrackU", font=FONT_BRAND, bg=COLOR_NAVBAR, fg="black")
     navbar_canvas_ref.create_window(20, event.height / 2, window=brand_label, anchor="w")
 
-    dashboard_title_label = tk.Label(navbar_canvas_ref, text="Dashboard", font=("Georgia", 16), bg=COLOR_NAVBAR,
+    # MODIFIED: Display logged-in username in the top right header
+    if logged_in_username and logged_in_username != "Guest":
+        welcome_text = f"Dashboard"
+    else:
+        welcome_text = "Dashboard"
+
+    dashboard_title_label = tk.Label(navbar_canvas_ref, text=welcome_text, font=("Georgia", 16), bg=COLOR_NAVBAR,
                                      fg="#222")
     navbar_canvas_ref.create_window(event.width - 30, event.height / 2, window=dashboard_title_label, anchor="e")
 
@@ -350,7 +432,7 @@ def on_menu_item_click(item_name):
     """Handles the click event for sidebar menu items."""
     print(f"'{item_name}' was clicked!")
 
-    global root_window, logged_in_user_id
+    global root_window, logged_in_user_id # Ensure logged_in_user_id is accessible
 
     current_dashboard_dir = os.path.dirname(__file__)
     script_to_launch = None
@@ -367,11 +449,15 @@ def on_menu_item_click(item_name):
         script_to_launch = os.path.join(current_dashboard_dir, "..", "TOTAL EXPENSES", "expenses.py")
     elif item_name == "Total Savings":
         # Path to savings.py within TOTAL SAVINGS folder
-        script_to_launch = os.path.join(current_dashboard_dir, "..", "TOTAL SAVINGS",
-                                        "savings.py")  # Corrected to savings.py
+        script_to_launch = os.path.join(current_dashboard_dir, "..", "TOTAL SAVINGS", "savings.py")
     elif item_name == "Profile":
-        messagebox.showinfo("Profile", "Profile functionality coming soon!")
-        return  # Don't close window for this
+        # Path to profile_app.py in Python Coding/ (project root)
+        script_to_launch = os.path.abspath(os.path.join(current_dashboard_dir, "..", "profile_app.py"))
+        # Note: If your profile.py is in IPT_IM_SYSTEM as per earlier trace, adjust path:
+        # script_to_launch = os.path.abspath(os.path.join(current_dashboard_dir, "..", "IPT_IM_SYSTEM", "profile.py"))
+        # The user has now provided the profile.py code in `profile_app_file` immersive.
+        # So I will assume the name is profile_app.py and its location is `../profile_app.py`
+        # in relation to the `DASHBOARD` folder.
 
     if script_to_launch:
         try:
@@ -379,7 +465,7 @@ def on_menu_item_click(item_name):
             if root_window and root_window.winfo_exists():
                 root_window.destroy()
 
-            # Then, launch the new script
+            # Then, launch the new script, passing user_id
             cmd = [sys.executable, script_to_launch]
             if logged_in_user_id is not None: # Pass user ID if available
                 cmd.append(str(logged_in_user_id))
@@ -391,7 +477,7 @@ def on_menu_item_click(item_name):
 
             print(f"Launched: {script_to_launch}")
         except FileNotFoundError:
-            messagebox.showerror("Launch Error", "Python interpreter not found. Ensure Python is in your PATH.")
+            messagebox.showerror("Launch Error", f"Script not found: {script_to_launch}. Ensure paths are correct.")
         except Exception as e:
             messagebox.showerror("Launch Error", f"Failed to launch {script_to_launch}:\n{e}")
 
@@ -399,6 +485,10 @@ def on_menu_item_click(item_name):
 def refresh_all_dashboard_data(event=None):
     """Refreshes all dynamic data on the dashboard. Called on month change or initial load."""
     global left_expense_box_canvas_ref, left_savings_box_canvas_ref, right_transaction_canvas_ref
+    global welcome_label_ref, logged_in_username # Access welcome_label_ref and logged_in_username
+
+    # Update Welcome Label with current username
+    welcome_label_ref.config(text=f"Welcome, {logged_in_username}")
 
     # Ensure canvases exist and are mapped before calling updates
     # We call update_idletasks before getting dimensions inside the update functions
@@ -424,13 +514,14 @@ def create_dashboard_app():
     global expense_bar_canvas_ref, savings_bar_canvas_ref
     global welcome_label_ref
     global logged_in_user_id, logged_in_username
+    global sidebar_icons # Make sure sidebar_icons is global for modifications
 
     root_window = tk.Tk()
     root_window.title("TrackU Dashboard")
     root_window.state("zoomed")  # Start maximized
     root_window.configure(bg=COLOR_BG)
 
-    # Initialize the database
+    # Initialize the database (IMPORTANT: This ensures the DB exists and tables are created)
     database_manager.initialize_db()
 
     # --- Retrieve User ID from command line arguments ---
@@ -443,13 +534,12 @@ def create_dashboard_app():
                 logged_in_username = fetched_username
             else:
                 print(f"Warning: User with ID {logged_in_user_id} not found in database. Using default 'Guest'.")
+                logged_in_user_id = None # Set to None if not found
         except ValueError:
             print("Error: Invalid user ID provided as command-line argument. Using default 'Guest'.")
             logged_in_user_id = None # Ensure it's None if conversion fails
     else:
         print("No user ID provided as command-line argument. Running as guest or default user.")
-        # If no ID is provided, you might want to try to get a default user or prompt for login
-        # For this scenario, we'll keep it as "Guest" and logged_in_user_id as None.
 
     # --- Grid Configuration for main window ---
     root_window.grid_columnconfigure(0, weight=0, minsize=250)  # Sidebar column
@@ -463,90 +553,157 @@ def create_dashboard_app():
     savings_month_var = tk.StringVar(value=current_month_name)
 
     # --- LEFT SIDEBAR FRAME ---
-    sidebar_frame = tk.Frame(root_window, bg=COLOR_SIDEBAR, width=250, highlightthickness=0)  # Set fixed width
+    SIDEBAR_WIDTH = 400 # Increased sidebar width for even bigger boxes
+
+    sidebar_frame = tk.Frame(root_window, bg=COLOR_SIDEBAR, width=SIDEBAR_WIDTH, highlightthickness=0)  # Set fixed width
     sidebar_frame.grid(row=0, column=0, rowspan=2, sticky="nsew")
     sidebar_frame.grid_propagate(False)  # Prevent frame from shrinking to fit contents
     sidebar_frame.grid_columnconfigure(0, weight=1)
 
-    global sidebar_logo_img  # Keep reference to avoid garbage collection
-    sidebar_logo_img = None
+    # Define icon paths relative to the script's directory
+    icon_paths = {
+        "Dashboard": os.path.join(current_script_dir, "dashboard.png"),
+        "Total Savings": os.path.join(current_script_dir, "piggy-bank.png"),
+        "Total Expenses": os.path.join(current_script_dir, "spending.png"),
+        "Profile": os.path.join(current_script_dir, "user.png")
+    }
+
+    # Load sidebar icons once during app creation
+    for key, path in icon_paths.items():
+        try:
+            if os.path.exists(path):
+                img = Image.open(path).resize(ICON_SIZE, Image.LANCZOS) # Use defined ICON_SIZE
+                sidebar_icons[key] = ImageTk.PhotoImage(img)
+            else:
+                sidebar_icons[key] = None
+                print(f"Warning: Icon '{path}' not found.")
+        except Exception as e:
+            sidebar_icons[key] = None
+            print(f"Error loading icon '{path}': {e}")
+
+
+    # Helper functions for hover effects (moved outside lambda)
+    def _on_enter_menu_item(event, canvas_widget, item_text, current_page_name):
+        # Change background of the canvas only if not the current page
+        if item_text != current_page_name:
+            canvas_widget.config(bg="#e0e0e0")
+
+    def _on_leave_menu_item(event, canvas_widget, item_text, current_page_name):
+        # Revert background of the canvas
+        if item_text != current_page_name:
+            canvas_widget.config(bg=COLOR_SIDEBAR)
+
+
+    # Helper function to create menu items with icons
+    def create_icon_menu(parent, text, command):
+        # Increased height and adjusted width for even larger boxes
+        canvas = tk.Canvas(parent, width=SIDEBAR_WIDTH - 60, height=140, bg=COLOR_SIDEBAR, highlightthickness=0)
+        r = 35 # Increased radius for more rounded corners on larger box
+        icon_x_offset = 25 # Adjusted x-offset
+        icon_y_offset = 25 # Adjusted y-offset
+        icon_box_width = 140 # Increased icon box width
+        icon_box_height = 110 # Increased icon box height
+
+        # Draw rounded box for the icon
+        canvas.create_arc(icon_x_offset, icon_y_offset, icon_x_offset + 2 * r, icon_y_offset + 2 * r,
+                          start=90, extent=90, fill=COLOR_NAVBAR, outline=COLOR_NAVBAR)
+        canvas.create_arc(icon_x_offset + icon_box_width - 2 * r, icon_y_offset, icon_x_offset + icon_box_width, icon_y_offset + 2 * r,
+                          start=0, extent=90, fill=COLOR_NAVBAR, outline=COLOR_NAVBAR)
+        canvas.create_arc(icon_x_offset, icon_y_offset + icon_box_height - 2 * r, icon_x_offset + 2 * r, icon_y_offset + icon_box_height,
+                          start=180, extent=90, fill=COLOR_NAVBAR, outline=COLOR_NAVBAR)
+        canvas.create_arc(icon_x_offset + icon_box_width - 2 * r, icon_y_offset + icon_box_height - 2 * r, icon_x_offset + icon_box_width, icon_y_offset + icon_box_height,
+                          start=270, extent=90, fill=COLOR_NAVBAR, outline=COLOR_NAVBAR)
+        canvas.create_rectangle(icon_x_offset + r, icon_y_offset, icon_x_offset + icon_box_width - r, icon_y_offset + icon_box_height,
+                               fill=COLOR_NAVBAR, outline=COLOR_NAVBAR)
+        canvas.create_rectangle(icon_x_offset, icon_y_offset + r, icon_x_offset + icon_box_width, icon_y_offset + icon_box_height - r,
+                               fill=COLOR_NAVBAR, outline=COLOR_NAVBAR)
+
+        # Place the image in the center of the rounded box
+        if sidebar_icons.get(text):
+            canvas.create_image(icon_x_offset + icon_box_width // 2, icon_y_offset + icon_box_height // 2,
+                                image=sidebar_icons[text], anchor="center")
+        else:
+            # Placeholder text if image fails to load
+            canvas.create_text(icon_x_offset + icon_box_width // 2, icon_y_offset + icon_box_height // 2,
+                               text="?", font=("Arial", 24), fill="gray", anchor="center") # Larger placeholder font
+
+        # Place the label to the right of the icon box
+        label_x = icon_x_offset + icon_box_width + 20
+        label_y = canvas.winfo_height() * 80
+        label_width = SIDEBAR_WIDTH - label_x - 30  # Adjust as needed
+
+        canvas.create_text(
+            label_x, label_y,
+            text=text,
+            font=FONT_MENU,
+            fill="black",
+            anchor="w",
+            width=label_width  # Enables text wrapping
+        )
+
+            # Bind click event to the canvas
+        canvas.bind("<Button-1>", lambda e: command())
+        # Bind hover events to call the helper functions
+        canvas.bind("<Enter>", lambda e, c=canvas, t=text, cp="Dashboard": _on_enter_menu_item(e, c, t, cp))
+        canvas.bind("<Leave>", lambda e, c=canvas, t=text, cp="Dashboard": _on_leave_menu_item(e, c, t, cp))
+
+        return canvas
+
+
+    menu_items = [
+        ("Dashboard", lambda: on_menu_item_click("Dashboard")),
+        ("Total Savings", lambda: on_menu_item_click("Total Savings")),
+        ("Total Expenses", lambda: on_menu_item_click("Total Expenses")),
+        ("Profile", lambda: on_menu_item_click("Profile")),
+    ]
+
+    # Dynamically calculate rows for proper spacing
+    total_menu_items = len(menu_items)
+    sidebar_frame.grid_rowconfigure(0, weight=0) # For the TrackU logo
+    for i in range(1, total_menu_items + 1):
+        sidebar_frame.grid_rowconfigure(i, weight=0) # For each menu item
+    sidebar_frame.grid_rowconfigure(total_menu_items + 1, weight=1) # To push last item down if needed
+
+
+    # Placing the main TrackU logo at the top of the sidebar
+    global sidebar_logo_img_main
+    sidebar_logo_img_main = None
     try:
-        # Adjusted path logic to be relative to the script's directory
-        script_dir = os.path.dirname(__file__)
-        logo_path_attempt = os.path.join(script_dir, "testlogo.png")
-        if not os.path.exists(logo_path_attempt):  # If not in current dir, check 'icons' subdir
-            logo_path_attempt = os.path.join(script_dir, "icons", "testlogo.png")
+        logo_path_attempt = os.path.join(current_script_dir, "testlogo.png")
+        if not os.path.exists(logo_path_attempt):
+            logo_path_attempt = os.path.join(current_script_dir, "icons", "testlogo.png")
 
         if os.path.exists(logo_path_attempt):
             img = Image.open(logo_path_attempt).resize(LOGO_SIZE_SIDEBAR, Image.LANCZOS)
-            sidebar_logo_img = ImageTk.PhotoImage(img)
-            logo_label = tk.Label(sidebar_frame, image=sidebar_logo_img, bg=COLOR_SIDEBAR, borderwidth=0)
+            sidebar_logo_img_main = ImageTk.PhotoImage(img)
+            logo_label = tk.Label(sidebar_frame, image=sidebar_logo_img_main, bg=COLOR_SIDEBAR, borderwidth=0)
             logo_label.grid(row=0, column=0, pady=(20, 10), sticky="n")
         else:
             logo_label = tk.Label(sidebar_frame, text="TrackU Logo", font=("Arial", 16, "bold"), bg=COLOR_SIDEBAR,
                                   fg="darkgray")
             logo_label.grid(row=0, column=0, pady=(20, 10), sticky="n")
-            print("Warning: testlogo.png not found for sidebar. Using placeholder text.")
+            print("Warning: testlogo.png not found for main sidebar logo. Using placeholder text.")
     except Exception as e:
-        print(f"Error loading sidebar logo: {e}. Using placeholder text.")
+        print(f"Error loading main sidebar logo: {e}. Using placeholder text.")
         logo_label = tk.Label(sidebar_frame, text="TrackU Logo", font=("Arial", 16, "bold"), bg=COLOR_SIDEBAR,
                               fg="darkgray")
         logo_label.grid(row=0, column=0, pady=(20, 10), sticky="n")
 
-    menu_items = ["", "", "Dashboard", "Total Expenses", "Total Savings", "", "", "", "", "", "Profile"]
 
-    row_idx = 1
-    for item in menu_items:
-        if item:
-            # Add separator before items, except for the first actual item
-            if row_idx > 1 and item not in ["Dashboard"]:  # Don't add separator before first item or after last dummy
-                prev_item_index = menu_items.index(item) - 1
-                if prev_item_index >= 0 and menu_items[prev_item_index] != "":  # Check if previous item was not empty
-                    separator_frame = tk.Frame(sidebar_frame, bg=COLOR_BOX_BORDER, height=1)
-                    separator_frame.grid(row=row_idx, column=0, sticky="ew", padx=10, pady=(5, 5))
-                    row_idx += 1
+    for idx, (label, cmd) in enumerate(menu_items):
+        menu_canvas = create_icon_menu(sidebar_frame, label, cmd)
+        # Highlight current page button
+        if label == "Dashboard":
+            menu_canvas.config(bg=COLOR_NAVBAR)
+        menu_canvas.grid(row=idx + 1, column=0, pady=8, padx=8, sticky="ew")
 
-            menu_button = tk.Button(
-                sidebar_frame,
-                text=item,
-                font=FONT_MENU,
-                bg=COLOR_SIDEBAR,
-                fg="black",
-                command=lambda i=item: on_menu_item_click(i),
-                relief="flat",
-                activebackground=COLOR_NAVBAR,
-                anchor="w",
-                padx=15
-            )
-            # Highlight Dashboard button as it's the current page
-            if item == "Dashboard":
-                menu_button.config(bg=COLOR_NAVBAR)
+    # Add a spacer to push content to the top
+    tk.Label(sidebar_frame, text="", bg=COLOR_SIDEBAR).grid(row=len(menu_items) + 1, column=0, sticky="nsew")
+    sidebar_frame.grid_rowconfigure(len(menu_items) + 1, weight=1)
 
-            # Hover effects
-            def _on_enter(event, btn=menu_button, current=item, current_page="Dashboard"):
-                if current != current_page:
-                    btn.config(bg="#e0e0e0")
-
-            def _on_leave(event, btn=menu_button, current=item, current_page="Dashboard"):
-                if current != current_page:
-                    btn.config(bg=COLOR_SIDEBAR)
-
-            menu_button.bind("<Enter>", _on_enter)
-            menu_button.bind("<Leave>", _on_leave)
-
-            menu_button.grid(row=row_idx, column=0, pady=5, sticky="ew")
-            row_idx += 1
-        else:  # Handle empty strings for spacing
-            if item == "" and "Profile" in menu_items and menu_items.index("Profile") == menu_items.index(item) + 1:
-                # This empty label ensures the profile button goes to the bottom
-                sidebar_frame.grid_rowconfigure(row_idx, weight=1)
-            tk.Label(sidebar_frame, text="", bg=COLOR_SIDEBAR).grid(row=row_idx, column=0, pady=0)
-            row_idx += 1
-
-    sidebar_frame.grid_rowconfigure(row_idx, weight=1)  # Push content up
 
     # --- TOP RIGHT HEADER / NAVBAR ---
-    navbar_canvas_ref = tk.Canvas(root_window, bg=COLOR_BG, height=85, highlightthickness=0)
+    navbar_canvas_ref = tk.Canvas(root_window, bg=COLOR_BG, height=110, highlightthickness=0)
     navbar_canvas_ref.grid(row=0, column=1, sticky="nsew")
     navbar_canvas_ref.bind("<Configure>", draw_navbar_content)
 

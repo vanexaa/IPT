@@ -33,14 +33,14 @@ except Exception as e:
 
 # --- Colors and Fonts ---
 LEFT_BG = "#d6e9d5"
-RIGHT_BG = "#fdf6e3"
+RIGHT_BG = "#fdfdf5"
 CARD_BG = "#fbe3c0"
 ACCENT = "#d6e9d5"
 FONT_SUB = ("Playfair Display", 16)
 FONT_BTN = ("Playfair Display", 20, "bold")
 LOGO_SIZE = (200, 150)
-CARD_WIDTH = 500
-CARD_HEIGHT = 450  # Adjusted height to accommodate single entry and buttons
+CARD_WIDTH = 450
+CARD_HEIGHT = 550  # Adjusted height to accommodate single entry and buttons
 
 # Global reference for the root window
 root_window = None
@@ -247,7 +247,8 @@ def create_login_app():
         if w > 0 and h > 0:
             canvas.coords(card_window, w // 2, h // 2)
             canvas.tag_raise("login_card_window")
-        # draw_grid() # Commented out, only for development
+        # MODIFIED: Uncommented draw_grid()
+        draw_grid() # Now draws the grid on every configure event
 
     canvas.bind("<Configure>", center_card)
 
