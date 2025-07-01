@@ -8,14 +8,21 @@ import sys
 from datetime import datetime
 import calendar
 
+# Get the directory of the current script (dashboard.py is in DASHBOARD/)
 current_script_dir = os.path.dirname(__file__)
+
+
 database_folder_path = os.path.abspath(os.path.join(current_script_dir, "..", "TOTAL EXPENSES"))
 
+# Add this path to sys.path
 if database_folder_path not in sys.path:
     sys.path.append(database_folder_path)
 # ------------------------------------------
+
+# Import specific functions from database_manager
 import database_manager
 
+# --- Global Font Loading ---
 try:
     pyglet.font.add_file('Playfair Display.ttf')
 except Exception as e:
@@ -37,18 +44,18 @@ FONT_SUBTEXT = ("Playfair Display", 12)
 FONT_AMOUNT = ("Georgia", 24, "underline")
 FONT_TRANSACTION = ("Playfair Display", 11)
 FONT_BUTTON = ("Arial", 25)
-FONT_WELCOME = ("Playfair Display", 22, "bold")
+FONT_WELCOME = ("Playfair Display", 22, "bold") # This will be used for the welcome message
 
-# --- Bar Chart Colors ---
-BAR_COLOR = "#fdf6e3"
-BAR_FILL_COLOR = "#ffa726"
+BAR_COLOR = "#fdf6e3"  # Background of the bar chart canvas
+BAR_FILL_COLOR = "#ffa726"  # Color of the actual bars
 
-# --- Sizes ---
 LOGO_SIZE_SIDEBAR = (150, 100)
-ICON_SIZE = (48, 48)
+ICON_SIZE = (48, 48) # Define a size for menu icons
 
+# Global dictionary to store PhotoImage objects for sidebar icons
 sidebar_icons = {}
 
+# --- Global Tkinter StringVars for comboboxes ---
 expense_month_var = None
 savings_month_var = None
 
@@ -74,7 +81,7 @@ savings_bar_canvas_ref = None
 
 # --- Global variable to store the logged-in user's ID and Username ---
 logged_in_user_id = None
-logged_in_username = "Guest"
+logged_in_username = "Guest" # Default value if no user is passed
 
 right_container = None
 right_canvas = None
@@ -98,45 +105,47 @@ def draw_rounded_rect(canvas, x, y, w, h, r, color):
 
 
 def create_bar(canvas, data_values):
-    canvas.delete("bar", "bar_labels")
+    canvas.delete("bar", "bar_labels")  # Delete previous bars and labels
 
     canvas_width = canvas.winfo_width()
     canvas_height = canvas.winfo_height()
 
     if canvas_width <= 1 or canvas_height <= 1:
-        return
+        return  # Avoid drawing on uninitialized canvas
 
     if not data_values or all(v == 0 for v in data_values):
+        # Display a "No data" message
         canvas.create_text(canvas_width / 2, canvas_height / 2,
                            text="No data for this month.",
                            font=FONT_SUBTEXT, fill="gray", tags="bar_labels")
         return
 
     max_data_value = max(data_values)
-    if max_data_value == 0:
+    if max_data_value == 0:  # Should be caught by the above, but as a safeguard
         max_data_value = 1
 
     num_bars = len(data_values)
 
     # Calculate available space per bar (bar + spacing)
+    # Give some padding on the left/right
     padding_x = 10
     total_drawable_width = canvas_width - 2 * padding_x
 
     space_per_bar = total_drawable_width / num_bars
 
     # Try to make bars a fixed width if possible, or scale if too many
-    preferred_bar_width = 15
-    min_spacing = 5
+    preferred_bar_width = 15  # pixels
+    min_spacing = 5  # pixels
 
     # Calculate actual bar width and spacing
     actual_bar_width = min(preferred_bar_width, space_per_bar - min_spacing)
-    if actual_bar_width <= 0:
+    if actual_bar_width <= 0:  # Fallback if bars are too tight
         actual_bar_width = space_per_bar * 0.7
         actual_spacing = space_per_bar * 0.3
     else:
         actual_spacing = space_per_bar - actual_bar_width
 
-    x_start = padding_x + actual_spacing / 2
+    x_start = padding_x + actual_spacing / 2  # Initial offset from the left edge
 
     # Y-axis padding for bars (top and bottom)
     padding_y_top = 20
@@ -144,6 +153,7 @@ def create_bar(canvas, data_values):
     drawable_height = canvas_height - padding_y_top - padding_y_bottom
 
     for i, height in enumerate(data_values):
+        # Scale bar height relative to max_data_value and drawable height
         bar_height = (height / max_data_value) * drawable_height
 
         # Draw the bar from the bottom up
@@ -154,6 +164,7 @@ def create_bar(canvas, data_values):
                                 fill=BAR_FILL_COLOR, outline="", tags="bar")
 
         # Draw day label below the bar
+        # Only show labels for every 5th day or if there are few days
         if num_bars <= 10 or (i + 1) % 5 == 0:
             day_num = i + 1  # Days are 1-indexed
             canvas.create_text(x_start + actual_bar_width / 2, canvas_height - 10,
@@ -175,15 +186,18 @@ def update_left_box_canvas(event, box_canvas, box_type):
     if not box_canvas:
         return
 
-    box_canvas.delete("all")
+    box_canvas.delete("all")  # Clear the canvas
 
-
+    # Get current dimensions from the canvas, or use a default if event is None
+    # For initial call from refresh_all_dashboard_data (event=None), get current dimensions
+    # For <Configure> event, use event.width/height
     current_width = box_canvas.winfo_width() if event is None else event.width
     current_height = box_canvas.winfo_height() if event is None else event.height
 
     if current_width <= 1 or current_height <= 1:
-        return
+        return  # Canvas not yet properly sized
 
+    # Draw the main rounded rectangle background
     draw_rounded_rect(box_canvas, 0, 0, current_width, current_height, 20, COLOR_CANVAS_BAR)
 
     # Determine which global variables to use based on box_type
@@ -195,8 +209,7 @@ def update_left_box_canvas(event, box_canvas, box_type):
         month_var_instance = expense_month_var
         get_total_func = database_manager.get_total_expenses_by_month_year
         get_daily_func = database_manager.get_total_expenses_by_day_for_month_year
-        box_tag = "expense_box"
-
+        box_tag = "expense_box"  # Tag for the bar canvas window
     elif box_type == 'saving':
         month_combo_ref = savings_month_combo_widget_ref
         amount_lbl_ref = savings_amount_lbl_ref
@@ -205,9 +218,9 @@ def update_left_box_canvas(event, box_canvas, box_type):
         month_var_instance = savings_month_var
         get_total_func = database_manager.get_total_savings_by_month_year
         get_daily_func = database_manager.get_total_savings_by_day_for_month_year
-        box_tag = "saving_box"
+        box_tag = "saving_box"  # Tag for the bar canvas window
     else:
-        return
+        return  # Invalid box_type
 
     # Get selected month name, convert to number
     selected_month_name = month_var_instance.get()
@@ -217,13 +230,14 @@ def update_left_box_canvas(event, box_canvas, box_type):
     except ValueError:
         current_display_month_num = datetime.now().month  # Fallback
 
-    current_display_year = datetime.now().year
+    current_display_year = datetime.now().year  # Assuming current year for dashboard
 
 
     # --- Fetch Data ---
     total_amount = get_total_func(current_display_month_num, current_display_year)
     daily_data = get_daily_func(current_display_month_num, current_display_year)
 
+    # --- Update UI Elements ---
 
     # Place the month combobox
     box_canvas.create_window(current_width / 2, 40, window=month_combo_ref, anchor="center")
@@ -732,36 +746,39 @@ def create_dashboard_app():
 
     # Expense Bar Canvas (CREATED ONCE as a child of left_expense_box_canvas_ref)
     expense_bar_canvas_ref = tk.Canvas(left_expense_box_canvas_ref, bg=COLOR_CANVAS_BAR, highlightthickness=0)
+    # This bar_canvas_ref will be placed as a window on left_expense_box_canvas_ref when update_left_box_canvas runs.
 
-
+    # Bind the outer canvas to configure event to trigger its update function
     left_expense_box_canvas_ref.bind("<Configure>",
                                      lambda event: update_left_box_canvas(event, left_expense_box_canvas_ref,
                                                                           'expense'))
 
-
+    # Savings Box Canvas
     left_savings_box_canvas_ref = tk.Canvas(left_boxes_frame, bg=COLOR_BG, highlightthickness=0)
     left_savings_box_canvas_ref.grid(row=1, column=0, pady=15, sticky="nsew")
 
-
+    # Savings Month Combobox (CREATED ONCE)
     savings_month_combo_widget_ref = ttk.Combobox(left_savings_box_canvas_ref, textvariable=savings_month_var,
                                                   values=months,
                                                   state="readonly", font=FONT_SUBTEXT, justify="center", width=15)
     savings_month_combo_widget_ref.current(datetime.now().month - 1)
     savings_month_combo_widget_ref.bind("<<ComboboxSelected>>", refresh_all_dashboard_data)  # Re-bind to refresh all
 
-
+    # Savings Amount Label (CREATED ONCE)
     savings_amount_lbl_ref = tk.Label(left_savings_box_canvas_ref, text="₱ 0.00", font=FONT_AMOUNT, bg=COLOR_CANVAS_BAR,
                                       fg="black", anchor="w")
 
+    # Savings Bar Canvas (CREATED ONCE as a child of left_savings_box_canvas_ref)
     savings_bar_canvas_ref = tk.Canvas(left_savings_box_canvas_ref, bg=COLOR_CANVAS_BAR, highlightthickness=0)
 
+    # Bind the outer canvas to configure event to trigger its update function
     left_savings_box_canvas_ref.bind("<Configure>",
                                      lambda event: update_left_box_canvas(event, left_savings_box_canvas_ref, 'saving'))
 
-    # --- Recent Transactions ---
+    # --- RIGHT SECTION: Recent Transactions ---
     right_transaction_canvas_ref = tk.Canvas(boxes_container_frame, bg=COLOR_BG, highlightthickness=0)
     right_transaction_canvas_ref.grid(row=0, column=1, sticky="nsew", padx=(10, 10), pady=14)
-    right_transaction_canvas_ref.bind("<Configure>", update_right_canvas)
+    right_transaction_canvas_ref.bind("<Configure>", update_right_canvas)  # Pass only event, uses global ref
 
     # Initial data load and UI refresh
     root_window.update_idletasks()  # Ensure widgets have initial sizes before data is loaded
