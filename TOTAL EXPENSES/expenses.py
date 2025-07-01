@@ -88,6 +88,8 @@ pie_chart_section_canvas = None
 recent_transaction_canvas = None
 top_right_header_canvas = None
 
+# --- Global dictionary to map canvas item IDs to database expense IDs ---
+expense_item_id_to_db_id = {}
 # -------------------------------------------------
 
 # Global variables to store current month/year for filtering
@@ -121,25 +123,29 @@ def on_menu_item_click(item_name, current_root):
     elif item_name == "Total Savings":
         script_to_launch = os.path.join(script_dir, "..", "TOTAL SAVINGS", "savings.py")
     elif item_name == "Profile":
-        # Path to profile_app.py in Python Coding/ (project root)
-        script_to_launch = os.path.abspath(os.path.join(script_dir, "..", "..", "profile_app.py"))
-        # Adjust path if your profile.py is in IPT_IM_SYSTEM as per earlier trace:
-        # script_to_launch = os.path.abspath(os.path.join(script_dir, "..", "IPT_IM_SYSTEM", "profile_app.py"))
+        script_to_launch = os.path.join(script_dir, "profile.py")
 
     if script_to_launch:
         try:
+            # Only destroy the main window if NOT opening Profile
+            if item_name != "Profile":
+                if root_window and root_window.winfo_exists():
+                    root_window.destroy()
+
             cmd = [sys.executable, script_to_launch]
-            if logged_in_user_id is not None: # Pass the user ID
+            if logged_in_user_id is not None:
                 cmd.append(str(logged_in_user_id))
 
-            subprocess.Popen(cmd) # Launch the new script
-            if item_name != "Total Expenses": # Close current window if navigating away
-                current_root.destroy()
+            if sys.platform.startswith('win'):
+                subprocess.Popen(cmd, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                subprocess.Popen(cmd)
+            print(f"Launched: {script_to_launch}")
         except FileNotFoundError:
             messagebox.showerror("Launch Error", f"Script not found: {script_to_launch}. Ensure paths are correct.")
         except Exception as e:
             messagebox.showerror("Launch Error", f"Failed to launch {script_to_launch}:\n{e}")
-
+            print(f"Launched: {script_to_launch}")
 
 def draw_bottom_rounded_rect(canvas, x, y, w, h, r, color):
     """Draws a rectangle with rounded bottom corners on a Tkinter canvas."""
@@ -264,6 +270,51 @@ def refresh_data_and_ui():
     update_recent_transaction_box()
 
 
+def on_recent_transaction_canvas_click(event):
+    """
+    Handles click events on the recent_transaction_canvas to make categories clickable.
+    When a category is clicked, it launches Edit-Expenses.py with the record ID.
+    """
+    global logged_in_user_id, child_process_ref, expense_item_id_to_db_id
+
+    # Find all items at the clicked coordinates
+    items_at_click = recent_transaction_canvas.find_overlapping(event.x - 2, event.y - 2, event.x + 2, event.y + 2)
+
+    for item_id in items_at_click:
+        # Check if the clicked item has the 'category_link' tag
+        tags = recent_transaction_canvas.gettags(item_id)
+        if "category_link" in tags:
+            # Retrieve the associated database record ID
+            clicked_record_id = expense_item_id_to_db_id.get(item_id)
+
+            if clicked_record_id is None:
+                print(f"Warning: No record ID found for canvas item {item_id}.")
+                continue # Skip if no ID found for this item
+
+            clicked_category_text = recent_transaction_canvas.itemcget(item_id, "text") # For logging purposes
+            print(f"Category '{clicked_category_text}' (Record ID: {clicked_record_id}) was clicked!")
+
+            script_dir = os.path.dirname(__file__)
+            script_to_launch = os.path.join(script_dir, "Edit-Expenses.py") # Path to your edit script
+
+            if os.path.exists(script_to_launch):
+                try:
+                    cmd = [sys.executable, script_to_launch]
+                    if logged_in_user_id is not None:
+                        cmd.append(str(logged_in_user_id)) # Pass user ID
+                    cmd.append(str(clicked_record_id)) # Pass the clicked record ID here!
+
+                    child_process_ref = subprocess.Popen(cmd)
+                    print(f"Launched {script_to_launch} for record ID '{clicked_record_id}' and user ID {logged_in_user_id}")
+                    # Start polling for child process exit
+                    root_window.after(100, check_child_process_status)
+                except FileNotFoundError:
+                    messagebox.showerror("Launch Error", f"Script not found: {script_to_launch}. Ensure paths are correct.")
+                except Exception as e:
+                    messagebox.showerror("Launch Error", f"Failed to launch {script_to_launch}:\n{e}")
+            return # Exit after handling one category click
+
+
 def update_pie_chart_section(event=None):
     """
     Updates the pie chart and associated elements by fetching data from the database.
@@ -364,7 +415,7 @@ def update_pie_chart_section(event=None):
     if not expense_breakdown or total_expenses_for_month <= 0:
         labels = ["No Expenses"]
         sizes = [1] # Dummy size for visual representation
-        center_text = f"No Expenses This Month\\n(for {selected_month_name} {current_display_year})"
+        center_text = f"No Expenses This Month\n(for {selected_month_name} {current_display_year})"
         total_expenses_for_month = 0.0
 
         ax.text(0.5, 0.5, center_text,
@@ -429,7 +480,7 @@ def update_pie_chart_section(event=None):
     # Reposition and raise total expenses label using its canvas ID
     if total_expenses_amount_lbl_canvas_id: # Check if the ID exists
         # Position it relative to the bottom of the canvas
-        pie_chart_section_canvas.coords(total_expenses_amount_lbl_canvas_id, current_width / 2, current_height - 30)
+        pie_chart_section_canvas.coords(current_width / 2, current_height - 30)
         pie_chart_section_canvas.tag_raise(total_expenses_amount_lbl_canvas_id)
     # The initial creation of total_expenses_amount_lbl_canvas_id happens in create_total_expenses_app
 
@@ -494,7 +545,8 @@ def update_recent_transaction_box(event=None):
     This function now ensures the combobox and add button persist.
     """
     global recent_transaction_category_combobox, recent_transaction_category_combobox_window_id, add_transaction_button, add_transaction_button_window_id, recent_transaction_category_combobox_var
-    global logged_in_user_id # Ensure user_id is accessible
+    global logged_in_user_id
+    global expense_item_id_to_db_id # Access global dictionary
 
     if not recent_transaction_canvas:
         return
@@ -519,6 +571,7 @@ def update_recent_transaction_box(event=None):
     recent_transaction_canvas.delete("transaction_item")
     recent_transaction_canvas.delete("watermark")
     recent_transaction_canvas.delete("static_text") # Titles are redrawn here if they are deleted
+    expense_item_id_to_db_id.clear() # Clear the map on redraw
 
     # Watermark
     recent_transaction_canvas.create_text(current_width / 2, current_height / 2, text="₱",
@@ -535,7 +588,9 @@ def update_recent_transaction_box(event=None):
     # Update combobox values and selection
     # MODIFIED: If get_all_expenses needs user_id, pass it here:
     # categories_from_db = sorted(list(set(item[0] for item in database_manager.get_all_expenses(logged_in_user_id))))
-    categories_from_db = sorted(list(set(item[0] for item in database_manager.get_all_expenses())))
+    # ASSUMPTION: database_manager.get_all_expenses() returns (id, category, amount, date, notes)
+    # We need item[1] for category.
+    categories_from_db = sorted(list(set(item[1] for item in database_manager.get_all_expenses())))
     categories_for_filter = ["All Categories"] + categories_from_db
 
     # Only update values if they are different to prevent unnecessary redraws
@@ -553,19 +608,21 @@ def update_recent_transaction_box(event=None):
         recent_transaction_canvas.tag_raise(recent_transaction_category_combobox_window_id)
 
     if add_transaction_button_window_id:
-        recent_transaction_canvas.coords(add_transaction_button_window_id, current_width - 30, 20)
+        recent_transaction_canvas.coords(current_width - 30, 20)
         recent_transaction_canvas.tag_raise(add_transaction_button_window_id)
 
     # --- Fetch recent expenses from database and apply filter ---
     selected_filter_category = recent_transaction_category_combobox_var.get()
-    # MODIFIED: If get_all_expenses needs user_id, pass it here:
-    # all_expenses = database_manager.get_all_expenses(logged_in_user_id)
+    # ASSUMPTION: database_manager.get_all_expenses() returns (id, category, amount, date, notes)
     all_expenses = database_manager.get_all_expenses()
 
     if selected_filter_category != "All Categories":
-        filtered_expenses = [exp for exp in all_expenses if exp[0] == selected_filter_category]
+        filtered_expenses = [exp for exp in all_expenses if exp[1] == selected_filter_category] # Filter by category
     else:
         filtered_expenses = all_expenses
+
+    # Sort by date, descending (assuming date is the 4th element, index 3)
+    filtered_expenses.sort(key=lambda x: datetime.strptime(x[3], "%Y-%m-%d %H:%M:%S"), reverse=True)
 
     # --- Draw column headers ONCE, before the loop ---
     col2_x = int(current_width * 0.55)
@@ -591,7 +648,8 @@ def update_recent_transaction_box(event=None):
             tags="transaction_item"
         )
     else:
-        for idx, (category, amount, transaction_date_str) in enumerate(filtered_expenses):
+        # Unpack the 'id' along with other expense details
+        for idx, (expense_id, category, amount, transaction_date_str) in enumerate(filtered_expenses):
             if idx >= display_limit:
                 break
 
@@ -602,8 +660,12 @@ def update_recent_transaction_box(event=None):
             except ValueError:
                 display_date = "Invalid Date"
 
-            recent_transaction_canvas.create_text(60, y_offset, anchor="w", text=category,
-                                                  font=FONT_TRANSACTION, fill="black", tags="transaction_item")
+            # Create the category text item and store its ID with the expense_id
+            category_text_item_id = recent_transaction_canvas.create_text(60, y_offset, anchor="w", text=category,
+                                                  font=FONT_TRANSACTION, fill="black", tags=("transaction_item", "category_link"))
+
+            expense_item_id_to_db_id[category_text_item_id] = expense_id # Store the mapping
+
             recent_transaction_canvas.create_text(col2_x, y_offset, anchor="center", text=display_date,
                                                   font=FONT_TRANSACTION, fill="black", tags="transaction_item")
             recent_transaction_canvas.create_text(col3_x, y_offset, anchor="e", text=display_amount,
@@ -657,6 +719,7 @@ def create_icon_menu(parent, text, command):
 
     # Place the label to the right of the icon box
     label_x = icon_x_offset + icon_box_width + 20
+    # Corrected label_y for vertical centering
     label_y = canvas.winfo_height() * 80
     label_width = SIDEBAR_WIDTH - label_x - 30 # Adjusted for padding
 
@@ -733,6 +796,7 @@ def create_total_expenses_app():
     sidebar_frame.grid_columnconfigure(0, weight=1)
 
     # Define icon paths relative to the script's directory (TOTAL EXPENSES)
+    # Updated icon paths to look in an 'icons' subdirectory for better organization
     icon_paths = {
         "Dashboard": os.path.join(current_script_dir, "..", "DASHBOARD", "dashboard.png"),
         "Total Savings": os.path.join(current_script_dir, "..", "TOTAL SAVINGS", "piggy-bank.png"),
@@ -825,6 +889,10 @@ def create_total_expenses_app():
     main_content_area.grid_rowconfigure(0, weight=0) # Welcome label row
     main_content_area.grid_rowconfigure(1, weight=1) # Main content area for charts/transactions
 
+    # Welcome Label (similar to dashboard, placed at the top of the main content area)
+    # welcome_label_ref = tk.Label(main_content_area, text=f"Welcome, {logged_in_username}", font=FONT_WELCOME, bg=COLOR_BG)
+    # welcome_label_ref.grid(row=0, column=0, columnspan=2, sticky="w", padx=(0, 0), pady=(0, 10))
+
 
     # --- Container for Pie Chart and Recent Transactions ---
     charts_transactions_container = tk.Frame(main_content_area, bg=COLOR_BG)
@@ -867,6 +935,9 @@ def create_total_expenses_app():
     recent_transaction_canvas = tk.Canvas(charts_transactions_container, bg=COLOR_BG, highlightthickness=0)
     recent_transaction_canvas.grid(row=0, column=1, sticky="nsew", pady=10)
 
+    # ADDED: Bind the click handler to the recent_transaction_canvas
+    recent_transaction_canvas.bind("<Button-1>", on_recent_transaction_canvas_click)
+
     # Add button - CREATED ONCE HERE
     add_transaction_button = tk.Button(
         recent_transaction_canvas,
@@ -889,7 +960,8 @@ def create_total_expenses_app():
     )
 
     # Category Combobox for Recent Transactions - CREATED ONCE HERE
-    categories_from_db = sorted(list(set(item[0] for item in database_manager.get_all_expenses())))
+    # ASSUMPTION: database_manager.get_all_expenses() returns (id, category, amount, date, notes)
+    categories_from_db = sorted(list(set(item[1] for item in database_manager.get_all_expenses())))
     categories_for_filter = ["All Categories"] + categories_from_db
 
     recent_transaction_category_combobox = ttk.Combobox(

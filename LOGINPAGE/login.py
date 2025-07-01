@@ -6,27 +6,16 @@ import os
 import subprocess
 import sys
 
-# No longer explicitly importing sqlite3 here as database_manager abstracts it
 
-# --- Path setup for database_manager.py ---
 # Get the directory of the current script (login.py is in LOGINPAGE/)
 current_script_dir = os.path.dirname(__file__)
-
-# Go up one level (from LOGINPAGE/ to the project root, e.g., 'NEW_IPT/')
-# Then go into 'TOTAL EXPENSES' where database_manager.py is
 database_folder_path = os.path.abspath(os.path.join(current_script_dir, "..", "TOTAL EXPENSES"))
-
-# Add this path to sys.path
 if database_folder_path not in sys.path:
     sys.path.append(database_folder_path)
 # ------------------------------------------
-
-# IMPORTANT: Import the database_manager module after sys.path setup
 import database_manager
 
-# --- Global Font Loading ---
 try:
-    # This path assumes Playfair Display.ttf is in the same directory as login.py
     pyglet.font.add_file('Playfair Display.ttf')
 except Exception as e:
     print(f"Warning: Could not load Playfair Display.ttf. Using default system fonts. Error: {e}")
@@ -40,9 +29,8 @@ FONT_SUB = ("Playfair Display", 16)
 FONT_BTN = ("Playfair Display", 20, "bold")
 LOGO_SIZE = (200, 150)
 CARD_WIDTH = 450
-CARD_HEIGHT = 550  # Adjusted height to accommodate single entry and buttons
+CARD_HEIGHT = 550
 
-# Global reference for the root window
 root_window = None
 
 
@@ -113,8 +101,6 @@ def launch_dashboard(user_id):
 
     try:
         dashboard_path = os.path.abspath(os.path.join(current_script_dir, "..", "DASHBOARD", "dashboard.py"))
-
-        # Prepare command with Python executable and script path, plus the user_id argument
         cmd = [sys.executable, dashboard_path, str(user_id)]
 
         if sys.platform.startswith('win'):
@@ -150,11 +136,9 @@ def login_or_register(username_var, username_placeholder):
                                     f"Welcome, {username}! Your account has been created.")
                 launch_dashboard(user_id)
             else:
-                # This case should ideally not happen if add_user returns True, but handle defensively
                 messagebox.showerror("Error",
                                      "Account created but could not retrieve user ID. Please try logging in again.")
         else:
-            # add_user returned False, likely due to IntegrityError (username already exists from another process)
             messagebox.showerror("Error", f"Could not create account for '{username}'. It might already exist.")
 
 
@@ -166,8 +150,6 @@ def create_login_app():
     root_window.geometry("1100x600")
     root_window.minsize(800, 500)
 
-    # Initialize the database when the application starts
-    # This will now create the 'users' table as well, thanks to database_manager.py update
     database_manager.initialize_db()
 
     root_window.grid_rowconfigure(0, weight=1)
@@ -187,7 +169,6 @@ def create_login_app():
     global sidebar_logo_img  # Keep reference
     sidebar_logo_img = None
     try:
-        # Assuming testlogo.png is in the same directory as login.py
         if os.path.exists("testlogo.png"):
             img = Image.open("testlogo.png").resize(LOGO_SIZE, Image.LANCZOS)
             sidebar_logo_img = ImageTk.PhotoImage(img)
@@ -247,8 +228,7 @@ def create_login_app():
         if w > 0 and h > 0:
             canvas.coords(card_window, w // 2, h // 2)
             canvas.tag_raise("login_card_window")
-        # MODIFIED: Uncommented draw_grid()
-        draw_grid() # Now draws the grid on every configure event
+        draw_grid()
 
     canvas.bind("<Configure>", center_card)
 
@@ -257,7 +237,7 @@ def create_login_app():
     card_frame = tk.Frame(rounded_card, width=CARD_WIDTH, height=CARD_HEIGHT, bg=CARD_BG)
     rounded_card.create_window(CARD_WIDTH // 2, CARD_HEIGHT // 2, window=card_frame)
 
-    card_logo_img = None  # Needs to be global or held as a reference by a widget
+    card_logo_img = None
     try:
         # Assuming testlogo.png is in the same directory as login.py
         if os.path.exists("testlogo.png"):

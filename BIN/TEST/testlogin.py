@@ -88,8 +88,8 @@ def create_login_app():
     # Logo in left panel
     logo_img = None
     try:
-        if os.path.exists("testlogo.png"):
-            img = Image.open("testlogo.png").resize(LOGO_SIZE, Image.LANCZOS)
+        if os.path.exists("../../LOGINPAGE/testlogo.png"):
+            img = Image.open("../../LOGINPAGE/testlogo.png").resize(LOGO_SIZE, Image.LANCZOS)
             logo_img = ImageTk.PhotoImage(img)
             logo = tk.Label(welcome_container, image=logo_img, borderwidth=0, bg=LEFT_BG)
             logo.image = logo_img # Keep a reference to prevent garbage collection
@@ -177,8 +177,8 @@ def create_login_app():
     # Card Logo (inside the login card)
     card_logo_img = None
     try:
-        if os.path.exists("testlogo.png"):
-            img_card = Image.open("testlogo.png").resize(LOGO_SIZE, Image.LANCZOS)
+        if os.path.exists("../../LOGINPAGE/testlogo.png"):
+            img_card = Image.open("../../LOGINPAGE/testlogo.png").resize(LOGO_SIZE, Image.LANCZOS)
             card_logo_img = ImageTk.PhotoImage(img_card)
             card_logo = tk.Label(card_frame, image=card_logo_img, bg=CARD_BG, borderwidth=0)
             card_logo.image = card_logo_img # Keep a reference!
