@@ -1,2 +1,2 @@
 # IPT
-basta code toh
+jusko namang buhay to
