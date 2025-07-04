@@ -278,14 +278,27 @@ class RoundedGUI:
 
     def delete_account_action(self):
         print("DELETE ACCOUNT button clicked!")
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete your account? This cannot be undone."):
-            print("Account deletion confirmed. Deleting account...")
-            success = database_manager.delete_user(self.user_id)
-            if success:
-                messagebox.showinfo("Account Deleted", "Your account has been successfully deleted.")
+        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete your account and all associated data? This action will permanently delete the entire database file."):
+            print("Account deletion confirmed. Attempting to delete database file...")
+            # Close the database connection if it's open anywhere in the profile GUI itself
+            # Although the database_manager functions open and close connections,
+            # it's good practice to ensure no lingering connections from the GUI side
+            # that might prevent file deletion.
+
+            # It's crucial to call delete_database_file() first, as deleting the user from the
+            # database file is pointless if the file itself is about to be removed.
+            # However, if you want to log that the user was 'deleted' from the
+            # perspective of the database records *before* the file is gone,
+            # you'd reverse the order or handle it carefully.
+            # For a full 'account wipe' including the file, deleting the file is the primary goal.
+
+            db_delete_success = database_manager.delete_database_file()
+
+            if db_delete_success:
+                messagebox.showinfo("Account Deleted", "Your account and all associated data (database file) have been successfully deleted.")
                 self.master.destroy() # Close the window after deletion
             else:
-                messagebox.showerror("Account Deletion Failed", "An error occurred while trying to delete your account.")
+                messagebox.showerror("Account Deletion Failed", "An error occurred while trying to delete the database file. Please ensure the application has permissions and the file is not in use.")
         else:
             print("Account deletion cancelled.")
 

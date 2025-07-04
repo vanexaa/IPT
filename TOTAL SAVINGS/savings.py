@@ -475,8 +475,7 @@ def update_pie_chart_section(event=None):  # Make event optional
     )
     # Reposition and raise total expenses label using its canvas ID
     pie_chart_section_canvas.delete("total_savings_label")  # Remove old one if exists before recreating
-    pie_chart_section_canvas.create_window(
-        current_width / 2, current_height - 30,  # Position near the bottom center
+    pie_chart_section_canvas.create_window(current_width / 2, current_height - 30,  # Position near the bottom center
         window=total_savings_amount_lbl_widget_ref, anchor="s", tags="total_savings_label"
     )
     pie_chart_section_canvas.tag_raise("total_savings_label")  # Ensure it's on top

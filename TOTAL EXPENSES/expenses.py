@@ -271,48 +271,38 @@ def refresh_data_and_ui():
 
 
 def on_recent_transaction_canvas_click(event):
-    """
-    Handles click events on the recent_transaction_canvas to make categories clickable.
-    When a category is clicked, it launches Edit-Expenses.py with the record ID.
-    """
-    global logged_in_user_id, child_process_ref, expense_item_id_to_db_id
+    global recent_transaction_category_combobox_var, logged_in_user_id, category_child_process_ref
 
-    # Find all items at the clicked coordinates
     items_at_click = recent_transaction_canvas.find_overlapping(event.x - 2, event.y - 2, event.x + 2, event.y + 2)
 
     for item_id in items_at_click:
-        # Check if the clicked item has the 'category_link' tag
         tags = recent_transaction_canvas.gettags(item_id)
         if "category_link" in tags:
-            # Retrieve the associated database record ID
-            clicked_record_id = expense_item_id_to_db_id.get(item_id)
-
-            if clicked_record_id is None:
-                print(f"Warning: No record ID found for canvas item {item_id}.")
-                continue # Skip if no ID found for this item
-
-            clicked_category_text = recent_transaction_canvas.itemcget(item_id, "text") # For logging purposes
-            print(f"Category '{clicked_category_text}' (Record ID: {clicked_record_id}) was clicked!")
-
+            clicked_category_text = recent_transaction_canvas.itemcget(item_id, "text")
             script_dir = os.path.dirname(__file__)
-            script_to_launch = os.path.join(script_dir, "Edit-Expenses.py") # Path to your edit script
+            script_to_launch = os.path.join(script_dir, "Edit-Expenses.py")
 
             if os.path.exists(script_to_launch):
                 try:
                     cmd = [sys.executable, script_to_launch]
                     if logged_in_user_id is not None:
-                        cmd.append(str(logged_in_user_id)) # Pass user ID
-                    cmd.append(str(clicked_record_id)) # Pass the clicked record ID here!
+                        cmd.append(str(logged_in_user_id))
+                    cmd.append(clicked_category_text)
 
-                    child_process_ref = subprocess.Popen(cmd)
-                    print(f"Launched {script_to_launch} for record ID '{clicked_record_id}' and user ID {logged_in_user_id}")
-                    # Start polling for child process exit
-                    root_window.after(100, check_child_process_status)
-                except FileNotFoundError:
-                    messagebox.showerror("Launch Error", f"Script not found: {script_to_launch}. Ensure paths are correct.")
+                    category_child_process_ref = subprocess.Popen(cmd)
+
+                    def poll_popup():
+                        global category_child_process_ref
+                        if category_child_process_ref is not None and category_child_process_ref.poll() is None:
+                            root_window.after(300, poll_popup)
+                        else:
+                            refresh_data_and_ui()
+                            category_child_process_ref = None
+
+                    poll_popup()
                 except Exception as e:
                     messagebox.showerror("Launch Error", f"Failed to launch {script_to_launch}:\n{e}")
-            return # Exit after handling one category click
+            return
 
 
 def update_pie_chart_section(event=None):
@@ -476,13 +466,15 @@ def update_pie_chart_section(event=None):
     canvas_chart_widget_ref = canvas_chart_widget # Store reference
 
     # Update total expenses label (always update regardless of pie chart)
-    total_expenses_amount_lbl_widget_ref.config(text=f"Total Expenses: ₱ {total_expenses_for_month:,.2f}")
-    # Reposition and raise total expenses label using its canvas ID
-    if total_expenses_amount_lbl_canvas_id: # Check if the ID exists
-        # Position it relative to the bottom of the canvas
-        pie_chart_section_canvas.coords(current_width / 2, current_height - 30)
-        pie_chart_section_canvas.tag_raise(total_expenses_amount_lbl_canvas_id)
-    # The initial creation of total_expenses_amount_lbl_canvas_id happens in create_total_expenses_app
+    total_expenses_amount_lbl_widget_ref.config(
+        text=f"Total Expenses: ₱ {total_expenses_for_month:,.2f}",
+        justify=tk.CENTER
+    )
+    pie_chart_section_canvas.delete("total_expenses_label")  # Remove old one if exists before recreating
+    pie_chart_section_canvas.create_window(current_width / 2, current_height - 30,  # Position near the bottom center
+        window=total_expenses_amount_lbl_widget_ref, anchor="s", tags="total_expenses_label"
+    )
+    pie_chart_section_canvas.tag_raise("total_expenses_label")
 
     # --- Hover Logic for Pie Chart ---
     # Attach annotation object to the axis for persistence

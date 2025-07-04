@@ -14,9 +14,11 @@ def initialize_db():
     conn = connect_db()
     cursor = conn.cursor()
 
+    # MODIFIED: Changed users table 'id' to not AUTOINCREMENT,
+    # as we will manually manage inserting ID 1.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY, -- Removed AUTOINCREMENT
             username TEXT NOT NULL UNIQUE
         )
     ''')
@@ -46,15 +48,29 @@ def initialize_db():
     conn.commit()
     conn.close()
 
+# MODIFIED FUNCTION: add_user to strictly limit to user ID 1
 def add_user(username):
     conn = connect_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO users (username) VALUES (?)", (username,))
-        conn.commit()
-        print(f"User '{username}' added successfully.")
-        return True
+        # Check if any user already exists
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+
+        if user_count > 0:
+            # If there's already a user, do not allow adding another one.
+            # We are strictly limiting to one user (which we'll ensure is ID 1).
+            print("Cannot add user: A user record already exists (only one user allowed).")
+            return False
+        else:
+            # If no user exists, insert the first user with id = 1
+            cursor.execute("INSERT INTO users (id, username) VALUES (?, ?)", (1, username))
+            conn.commit()
+            print(f"User '{username}' added with ID 1.")
+            return True
     except sqlite3.IntegrityError:
+        # This handles cases where username is not unique (even if ID is different,
+        # which shouldn't happen with the count check, but good for robustness).
         print(f"Username '{username}' already exists. Please choose a different one.")
         return False
     except sqlite3.Error as e:
@@ -62,6 +78,7 @@ def add_user(username):
         return False
     finally:
         conn.close()
+
 
 def get_user_id(username):
     conn = connect_db()
@@ -83,7 +100,8 @@ def get_username_by_id(user_id):
     conn.close()
     return result[0] if result else None
 
-# NEW FUNCTION: Update username
+# Update username: This function is fine as it updates a specific user_id.
+# Since we enforce only ID 1 exists, this will implicitly update ID 1.
 def update_username(user_id, new_username):
     """
     Updates the username for a given user ID.
@@ -104,7 +122,8 @@ def update_username(user_id, new_username):
     finally:
         conn.close()
 
-# NEW FUNCTION: Delete user
+# Delete user: This function is fine as it deletes a specific user_id.
+# Since we enforce only ID 1 exists, this will implicitly delete ID 1.
 def delete_user(user_id):
     """
     Deletes a user from the database.
@@ -125,8 +144,25 @@ def delete_user(user_id):
     finally:
         conn.close()
 
+def delete_database_file():
+    """
+    Deletes the tracku_finance.db file.
+    Returns True on success, False on failure.
+    """
+    if os.path.exists(DATABASE_NAME):
+        try:
+            os.remove(DATABASE_NAME)
+            print(f"Database file '{DATABASE_NAME}' deleted successfully.")
+            return True
+        except OSError as e:
+            print(f"Error deleting database file '{DATABASE_NAME}': {e}")
+            return False
+    else:
+        print(f"Database file '{DATABASE_NAME}' does not exist.")
+        return False
 
-def add_savings_record(category, amount): # Removed default empty string for amount
+
+def add_savings_record(category, amount=""):
     conn = connect_db()
     cursor = conn.cursor()
     now = datetime.now()
@@ -146,16 +182,10 @@ def add_savings_record(category, amount): # Removed default empty string for amo
     finally:
         conn.close()
 
-# NEW FUNCTION: Update Savings Record
 def update_savings_record(record_id, new_category, new_amount):
-    """
-    Updates an existing savings record.
-    Returns True on success, False on failure.
-    """
     conn = connect_db()
     cursor = conn.cursor()
     try:
-        # Get current date/time for the update
         now = datetime.now()
         transaction_date = now.strftime("%Y-%m-%d %H:%M:%S")
         month = now.month
@@ -166,25 +196,20 @@ def update_savings_record(record_id, new_category, new_amount):
             (new_category, new_amount, transaction_date, month, year, record_id)
         )
         conn.commit()
-        return cursor.rowcount > 0 # Check if any row was actually updated
+        return cursor.rowcount > 0
     except sqlite3.Error as e:
         print(f"Error updating savings record with ID {record_id}: {e}")
         return False
     finally:
         conn.close()
 
-# NEW FUNCTION: Delete Savings Record
 def delete_savings_record(record_id):
-    """
-    Deletes a savings record from the database.
-    Returns True on success, False on failure.
-    """
     conn = connect_db()
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM savings WHERE id = ?", (record_id,))
         conn.commit()
-        return cursor.rowcount > 0 # Check if any row was actually deleted
+        return cursor.rowcount > 0
     except sqlite3.Error as e:
         print(f"Error deleting savings record with ID {record_id}: {e}")
         return False
@@ -212,16 +237,10 @@ def add_expense_record(category, amount):
     finally:
         conn.close()
 
-# NEW FUNCTION: Update Expense Record
 def update_expense_record(record_id, new_category, new_amount):
-    """
-    Updates an existing expense record.
-    Returns True on success, False on failure.
-    """
     conn = connect_db()
     cursor = conn.cursor()
     try:
-        # Get current date/time for the update
         now = datetime.now()
         transaction_date = now.strftime("%Y-%m-%d %H:%M:%S")
         month = now.month
@@ -232,37 +251,27 @@ def update_expense_record(record_id, new_category, new_amount):
             (new_category, new_amount, transaction_date, month, year, record_id)
         )
         conn.commit()
-        return cursor.rowcount > 0 # Check if any row was actually updated
+        return cursor.rowcount > 0
     except sqlite3.Error as e:
         print(f"Error updating expense record with ID {record_id}: {e}")
         return False
     finally:
         conn.close()
 
-# NEW FUNCTION: Delete Expense Record
 def delete_expense_record(record_id):
-    """
-    Deletes an expense record from the database.
-    Returns True on success, False on failure.
-    """
     conn = connect_db()
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM expenses WHERE id = ?", (record_id,))
         conn.commit()
-        return cursor.rowcount > 0 # Check if any row was actually deleted
+        return cursor.rowcount > 0
     except sqlite3.Error as e:
         print(f"Error deleting expense record with ID {record_id}: {e}")
         return False
     finally:
         conn.close()
 
-# NEW FUNCTION: Get a single expense record by ID
 def get_expense_by_id(expense_id):
-    """
-    Retrieves a single expense record by its ID.
-    Returns the record as a tuple (id, category, amount, transaction_date), or None if not found.
-    """
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id, category, amount, transaction_date FROM expenses WHERE id = ?", (expense_id,))
@@ -270,12 +279,7 @@ def get_expense_by_id(expense_id):
     conn.close()
     return record
 
-# NEW FUNCTION: Get a single savings record by ID (for consistency)
 def get_savings_by_id(saving_id):
-    """
-    Retrieves a single savings record by its ID.
-    Returns the record as a tuple (id, category, amount, transaction_date), or None if not found.
-    """
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute("SELECT id, category, amount, transaction_date FROM savings WHERE id = ?", (saving_id,))
@@ -415,149 +419,108 @@ if __name__ == "__main__":
     initialize_db()
     print("Database initialized. Tables 'users', 'savings' and 'expenses' are ready.")
 
-    # Check if any user exists
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM users")
-    user_count = cursor.fetchone()[0]
-    conn.close()
-
-    user_id = None
-    if user_count == 0:
-        print("\nNo users found. Let's create a new user.")
-        while user_id is None:
-            new_username = input("Enter a new username: ").strip()
-            if new_username:
-                if add_user(new_username):
-                    user_id = get_user_id(new_username)
-                else:
-                    print("Could not create user. Please try a different username.")
-            else:
-                print("Username cannot be empty. Please try again.")
+    sample_username = "testuser_dashboard"
+    user_id = get_user_id(sample_username)
+    if not user_id:
+        if add_user(sample_username):
+            user_id = get_user_id(sample_username)
+            print(f"User '{sample_username}' added with ID: {user_id}")
+        else:
+            print(f"Failed to add user '{sample_username}'.")
     else:
-        print("\nExisting users found.")
-        cursor = connect_db().cursor()
-        cursor.execute("SELECT username FROM users")
-        existing_users = [row[0] for row in cursor.fetchall()]
-        connect_db().close()
-        print("Available users: " + ", ".join(existing_users))
+        print(f"User '{sample_username}' already exists with ID: {user_id}. Using existing user.")
 
-        selected_username = None
-        while selected_username not in existing_users:
-            selected_username = input("Enter an existing username or type 'new' to create one: ").strip()
-            if selected_username.lower() == 'new':
-                while user_id is None:
-                    new_username = input("Enter a new username: ").strip()
-                    if new_username:
-                        if add_user(new_username):
-                            user_id = get_user_id(new_username)
-                        else:
-                            print("Could not create user. Please try a different username.")
-                    else:
-                        print("Username cannot be empty. Please try again.")
-                break # Exit the loop after creating a new user
-            elif selected_username in existing_users:
-                user_id = get_user_id(selected_username)
-                break
-            else:
-                print("Username not found. Please try again or type 'new'.")
+    print(f"\nTesting get_username_by_id for ID {user_id}: {get_username_by_id(user_id)}")
 
-    if user_id:
-        print(f"\nCurrently active user: {get_username_by_id(user_id)} (ID: {user_id})")
+    # Existing sample data additions (ensure you add data if DB is empty or for testing purposes)
+    print("\nAdding sample savings records:")
+    add_savings_record("Future Purchase", 500.25)
+    add_savings_record("Emergency Fund", 1000.00)
+    add_savings_record("General Savings", 150.75)
 
-        print(f"\nTesting get_username_by_id for ID {user_id}: {get_username_by_id(user_id)}")
+    last_month_date_s = date.today().replace(day=1) - timedelta(days=15)
+    last_month_s = last_month_date_s.month
+    last_year_s = last_month_date_s.year
 
-        # Existing sample data additions (ensure you add data if DB is empty or for testing purposes)
-        print("\nAdding sample savings records:")
-        add_savings_record("Future Purchase", 500.25)
-        add_savings_record("Emergency Fund", 1000.00)
-        add_savings_record("General Savings", 150.75)
+    conn_s = sqlite3.connect(DATABASE_NAME)
+    cursor_s = conn_s.cursor()
+    # Check if data already exists to avoid duplicates on repeated runs
+    cursor_s.execute("SELECT COUNT(*) FROM savings WHERE category = 'Personal Goals' AND month = ? AND year = ?", (last_month_s, last_year_s))
+    if cursor_s.fetchone()[0] == 0:
+        cursor_s.execute(
+            "INSERT INTO savings (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
+            ("Personal Goals", 200.00, f"{last_year_s}-{last_month_s:02d}-10 08:00:00", last_month_s, last_year_s)
+        )
+        cursor_s.execute(
+            "INSERT INTO savings (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
+            ("General Savings", 50.00, f"{last_year_s}-{last_month_s:02d}-20 12:00:00", last_month_s, last_year_s)
+        )
+        conn_s.commit()
+        print("Sample savings added for last month.")
+    conn_s.close()
 
-        last_month_date_s = date.today().replace(day=1) - timedelta(days=15)
-        last_month_s = last_month_date_s.month
-        last_year_s = last_month_date_s.year
+    print("\nAdding sample expense records:")
+    add_expense_record("Food", 75.50)
+    add_expense_record("Food", 25.00)
+    add_expense_record("Food", 12.00)
 
-        conn_s = sqlite3.connect(DATABASE_NAME)
-        cursor_s = conn_s.cursor()
-        # Check if data already exists to avoid duplicates on repeated runs
-        cursor_s.execute("SELECT COUNT(*) FROM savings WHERE category = 'Personal Goals' AND month = ? AND year = ?", (last_month_s, last_year_s))
-        if cursor_s.fetchone()[0] == 0:
-            cursor_s.execute(
-                "INSERT INTO savings (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
-                ("Personal Goals", 200.00, f"{last_year_s}-{last_month_s:02d}-10 08:00:00", last_month_s, last_year_s)
-            )
-            cursor_s.execute(
-                "INSERT INTO savings (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
-                ("General Savings", 50.00, f"{last_year_s}-{last_month_s:02d}-20 12:00:00", last_month_s, last_year_s)
-            )
-            conn_s.commit()
-            print("Sample savings added for last month.")
-        conn_s.close()
+    last_month_date_e = date.today().replace(day=1) - timedelta(days=1)
+    last_month_e = last_month_date_e.month
+    last_year_e = last_month_date_e.year
 
-        print("\nAdding sample expense records:")
-        add_expense_record("Food", 75.50)
-        add_expense_record("Food", 25.00)
-        add_expense_record("Food", 12.00)
+    conn_e = sqlite3.connect(DATABASE_NAME)
+    cursor_e = conn_e.cursor()
+    # Check if data already exists to avoid duplicates on repeated runs
+    cursor_e.execute("SELECT COUNT(*) FROM expenses WHERE category = 'Travel Fare' AND month = ? AND year = ?", (last_month_e, last_year_e))
+    if cursor_e.fetchone()[0] == 0:
+        cursor_e.execute(
+            "INSERT INTO expenses (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
+            ("Travel Fare", 100.00, f"{last_year_e}-{last_month_e:02d}-15 10:00:00", last_month_e, last_year_e)
+        )
+        cursor_e.execute(
+            "INSERT INTO expenses (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
+            ("School Supply", 50.00, f"{last_year_e}-{last_month_e:02d}-01 09:00:00", last_month_e, last_year_e)
+        )
+        conn_e.commit()
+        print("Sample expenses added for last month.")
+    conn_e.close()
 
-        last_month_date_e = date.today().replace(day=1) - timedelta(days=1)
-        last_month_e = last_month_date_e.month
-        last_year_e = last_month_date_e.year
+    print("\nAll Savings Records:")
+    for record in get_all_savings():
+        print(record)
 
-        conn_e = sqlite3.connect(DATABASE_NAME)
-        cursor_e = conn_e.cursor()
-        # Check if data already exists to avoid duplicates on repeated runs
-        cursor_e.execute("SELECT COUNT(*) FROM expenses WHERE category = 'Travel Fare' AND month = ? AND year = ?", (last_month_e, last_year_e))
-        if cursor_e.fetchone()[0] == 0:
-            cursor_e.execute(
-                "INSERT INTO expenses (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
-                ("Travel Fare", 100.00, f"{last_year_e}-{last_month_e:02d}-15 10:00:00", last_month_e, last_year_e)
-            )
-            cursor_e.execute(
-                "INSERT INTO expenses (category, amount, transaction_date, month, year) VALUES (?, ?, ?, ?, ?)",
-                ("School Supply", 50.00, f"{last_year_e}-{last_month_e:02d}-01 09:00:00", last_month_e, last_year_e)
-            )
-            conn_e.commit()
-            print("Sample expenses added for last month.")
-        conn_e.close()
+    print("\nAll Expense Records:")
+    for record in get_all_expenses():
+        print(record)
 
-        print("\nAll Savings Records:")
-        for record in get_all_savings():
-            print(record)
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+    print(
+        f"\nTotal Savings for current month ({current_month}/{current_year}): ₱{get_total_savings_by_month_year(current_month, current_year):.2f}")
+    print(
+        f"Total Expenses for current month ({current_month}/{current_year}): ₱{get_total_expenses_by_month_year(current_month, current_year):.2f}")
 
-        print("\nAll Expense Records:")
-        for record in get_all_expenses():
-            print(record)
+    print(f"\nExpense Breakdown for current month ({current_month}/{current_year}):")
+    for category, total in get_expense_breakdown_by_month_year(current_month, current_year):
+        print(f"- {category}: ₱{total:.2f}")
 
-        current_month = datetime.now().month
-        current_year = datetime.now().year
-        print(
-            f"\nTotal Savings for current month ({current_month}/{current_year}): ₱{get_total_savings_by_month_year(current_month, current_year):.2f}")
-        print(
-            f"Total Expenses for current month ({current_month}/{current_year}): ₱{get_total_expenses_by_month_year(current_month, current_year):.2f}")
+    print(f"\nSavings Breakdown for current month ({current_month}/{current_year}):")
+    for category, total in get_savings_breakdown_by_month_year(current_month, current_year):
+        print(f"- {category}: ₱{total:.2f}")
 
-        print(f"\nExpense Breakdown for current month ({current_month}/{current_year}):")
-        for category, total in get_expense_breakdown_by_month_year(current_month, current_year):
-            print(f"- {category}: ₱{total:.2f}")
+    print(f"\nDaily Expenses for current month ({current_month}/{current_year}):")
+    daily_exp = get_total_expenses_by_day_for_month_year(current_month, current_year)
+    for day, amount in enumerate(daily_exp, 1):
+        print(f"Day {day}: ₱{amount:.2f}")
 
-        print(f"\nSavings Breakdown for current month ({current_month}/{current_year}):")
-        for category, total in get_savings_breakdown_by_month_year(current_month, current_year):
-            print(f"- {category}: ₱{total:.2f}")
+    print(f"\nDaily Savings for current month ({current_month}/{current_year}):")
+    daily_sav = get_total_savings_by_day_for_month_year(current_month, current_year)
+    for day, amount in enumerate(daily_sav, 1):
+        print(f"Day {day}: ₱{amount:.2f}")
 
-        print(f"\nDaily Expenses for current month ({current_month}/{current_year}):")
-        daily_exp = get_total_expenses_by_day_for_month_year(current_month, current_year)
-        for day, amount in enumerate(daily_exp, 1):
-            print(f"Day {day}: ₱{amount:.2f}")
+    print("\nRecent Combined Transactions (Limit 5):")
+    for trans in get_recent_combined_transactions(limit=5):
+        print(trans)
 
-        print(f"\nDaily Savings for current month ({current_month}/{current_year}):")
-        daily_sav = get_total_savings_by_day_for_month_year(current_month, current_year)
-        for day, amount in enumerate(daily_sav, 1):
-            print(f"Day {day}: ₱{amount:.2f}")
-
-        print("\nRecent Combined Transactions (Limit 5):")
-        for trans in get_recent_combined_transactions(limit=5):
-            print(trans)
-
-        # --- Testing the new update functions ---
-        print("\n--- Testing Update Functions ---")
-    else:
-        print("\nNo user was selected or created. Exiting.")
+    # --- Testing the new update functions ---
+    print("\n--- Testing Update Functions ---")
